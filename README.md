@@ -69,4 +69,13 @@ npm run session:slack -- "C:\path\to\pasted-text.txt"
 
 The server-side profile route uses `.slack/session.json` to request `users.profile.get`, `users.profile.getSections`, `users.profile.getExtras`, and the workspace profile schema. The secret file is available to the bind-mounted development container but is excluded from Git and Docker image builds. Re-import it when the Slack session expires.
 
+After a directory refresh, rebuild the Profile details filter index:
+
+```bash
+npm run seed:profile-index
+npm run index:profiles
+```
+
+The search seeder quickly covers most members, then the resumable direct index fills any remaining IDs. The resulting git-ignored `.data/slack-profile-index.json` stores only `hasTitle`, `hasEmail`, `hasPhone`, and `hasPhoto` booleans—not profile values or credentials. Multiple selected checkboxes use AND logic.
+
 The curl payload still contains reusable Slack session credentials. Keep it outside the repository and revoke/rotate those credentials if the file has been shared.

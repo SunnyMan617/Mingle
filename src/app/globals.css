@@ -172,8 +172,8 @@ footer > span { text-align: right; }
 .modal-heading p { color: #c6cad4; margin: 8px 0 14px; font-size: 14px; }
 .modal-identity { display: flex; flex-wrap: wrap; gap: 7px 15px; margin: -5px 0 14px; color: #959daf; font-size: 10px; }
 .modal-department { background: rgba(255,255,255,.11); color: #d9d6ff; }
-.modal-body { display: grid; grid-template-columns: 1.55fr .75fr; min-height: 405px; }
-.modal-main { padding: 32px 40px 34px 48px; }
+.modal-body { min-height: 405px; }
+.modal-main { padding: 36px 48px 42px; }
 .modal-section + .modal-section { border-top: 1px solid #ece8e1; margin-top: 24px; padding-top: 22px; }
 .eyebrow { display: block; color: #8b8d9b; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 11px; }
 .bio { color: #596076; line-height: 1.65; font-size: 13px; margin: 0; }

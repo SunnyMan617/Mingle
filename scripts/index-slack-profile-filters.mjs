@@ -49,9 +49,13 @@ try { existing = JSON.parse(await readFile(outputPath, "utf8")); } catch {}
 const schema = await slackRequest("team.profile.get");
 const labels = new Map((schema.profile?.fields || []).map((field) => [field.id, String(field.label || field.field_name || "").toLowerCase()]));
 const allUsers = directory.users || [];
-const pending = allUsers.filter((person) => !existing.profiles?.[person.id]);
-const selected = requestedLimit > 0 ? pending.slice(0, requestedLimit) : pending;
 const profiles = { ...(existing.profiles || {}) };
+const currentUserIds = new Set(allUsers.map((person) => String(person.id)));
+for (const profileId of Object.keys(profiles)) {
+  if (!currentUserIds.has(profileId)) delete profiles[profileId];
+}
+const pending = allUsers.filter((person) => !profiles[person.id]);
+const selected = requestedLimit > 0 ? pending.slice(0, requestedLimit) : pending;
 let completed = 0;
 
 function hasLabeledValue(profile, expectedLabel) {

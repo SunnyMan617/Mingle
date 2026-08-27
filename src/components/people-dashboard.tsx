@@ -144,20 +144,6 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
             <div className="modal-section"><span className="eyebrow">Profile keywords</span><div className="modal-skills">{person.skills.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
             <div className="modal-section"><span className="eyebrow">All profile details</span>{detailsLoading ? <div className="details-loading"><i />Loading complete Slack profile…</div> : detailsError ? <div className="details-error">{detailsError}</div> : customFields.length > 0 ? <div className="profile-detail-grid">{customFields.map((field) => <div className="profile-detail" key={field.id}><small>{field.section} · {field.label}</small>{field.url ? <a href={field.url} target="_blank" rel="noreferrer">{field.displayValue}<Icon name="arrow" size={13} /></a> : <strong>{field.displayValue}</strong>}</div>)}</div> : <p className="no-details">No additional profile fields have been completed.</p>}</div>
           </div>
-          <aside className="contact-panel">
-            <span className="eyebrow">Contact & details</span>
-            {person.username && <div><span className="contact-icon"><Icon name="users" /></span><span><small>Slack username</small>@{person.username}</span></div>}
-            {(profile?.email || person.email) && <a href={`mailto:${profile?.email || person.email}`}><span className="contact-icon"><Icon name="mail" /></span><span><small>Email</small>{profile?.email || person.email}</span></a>}
-            {(profile?.phone || person.phone) && <a href={`tel:${profile?.phone || person.phone}`}><span className="contact-icon"><Icon name="phone" /></span><span><small>Phone</small>{profile?.phone || person.phone}</span></a>}
-            {(profile?.skype || person.skype) && <div><span className="contact-icon"><Icon name="phone" /></span><span><small>Skype</small>{profile?.skype || person.skype}</span></div>}
-            <div><span className="contact-icon"><Icon name="pin" /></span><span><small>Region & country</small>{[person.region, person.country].filter((value) => value && value !== "Unspecified").join(" · ") || "Not specified"}</span></div>
-            <div><span className="contact-icon"><Icon name="clock" /></span><span><small>Time zone</small>{person.location}{person.timezone && <em>{person.timezone}</em>}</span></div>
-            {person.locale && <div><span className="contact-icon"><Icon name="users" /></span><span><small>Locale</small>{person.locale}</span></div>}
-            <div><span className="contact-icon"><Icon name="briefcase" /></span><span><small>Account type</small>{person.isUltraRestricted ? "Single-channel guest" : person.isRestricted ? "Guest" : "Full member"}</span></div>
-            {liveDetails && <div><span className="contact-icon"><Icon name="users" /></span><span><small>Profile setup</small>{liveDetails.extras.onboardingComplete ? "Onboarding complete" : "Onboarding pending"}<em>{liveDetails.extras.channelCount.toLocaleString()} visible channels · {liveDetails.extras.sharedChannelCount.toLocaleString()} shared</em></span></div>}
-            <div><span className="contact-icon"><Icon name="calendar" /></span><span><small>Workspace</small>{person.joined}</span></div>
-            {(profile?.email || person.email) && <a className="message-button" href={`mailto:${profile?.email || person.email}`}><Icon name="mail" size={17} />Send a message</a>}
-          </aside>
         </div>
       </section>
     </div>
