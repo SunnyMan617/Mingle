@@ -34,6 +34,16 @@ New users request access from `/auth/sign-up`. They remain on the pending screen
 
 The development Compose service reads `.env` through `env_file`. Environment or dependency changes require a one-time container recreation; ordinary source and CSS changes continue to hot reload.
 
+### Publish real directory data for Vercel
+
+Vercel cannot access the git-ignored local `.data` files. Publish the current sanitized directory snapshot and profile-filter index to the private Supabase Storage bucket:
+
+```bash
+npm run publish:directory
+```
+
+The command gzip-compresses both snapshots before upload. The server-side directory API reads and decompresses these private objects with `SUPABASE_SECRET_KEY` when local files are unavailable. Add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and optionally `SUPABASE_DIRECTORY_BUCKET` to the Vercel project environment. The bucket is never made public. Run the publish command again after refreshing or re-indexing Slack data.
+
 ## Run with Docker and hot reload
 
 Build and start the development container once:

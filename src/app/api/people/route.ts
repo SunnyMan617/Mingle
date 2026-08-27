@@ -1,8 +1,11 @@
 import { stat, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { gunzip } from "node:zlib";
+import { promisify } from "node:util";
 import { people as demoPeople, Person } from "@/data/people";
 import { timezoneGeo } from "@/lib/timezone-geo";
 import { getApprovedAuthContext } from "@/lib/auth";
+import { createAuthAdminClient } from "@/lib/supabase/admin";
 
 type CacheFile = {
   syncedAt: string;
@@ -19,16 +22,45 @@ let memoryCache: CacheFile | null = null;
 let memoryCacheModifiedAt = 0;
 let profileIndexCache: ProfileIndex | null = null;
 let profileIndexModifiedAt = 0;
+let remoteDirectoryCache: CacheFile | null = null;
+let remoteDirectoryCachedAt = 0;
+let remoteProfileIndexCache: ProfileIndex | null = null;
+let remoteProfileIndexCachedAt = 0;
+
+const DIRECTORY_BUCKET = process.env.SUPABASE_DIRECTORY_BUCKET || "mingle-directory-data";
+const REMOTE_CACHE_TTL = 5 * 60 * 1000;
+const gunzipAsync = promisify(gunzip);
+
+async function readRemoteJson<T>(path: string): Promise<T> {
+  const supabase = createAuthAdminClient();
+  const { data, error } = await supabase.storage.from(DIRECTORY_BUCKET).download(path);
+  if (error) throw new Error(`Unable to download ${path}: ${error.message}`);
+  const json = await gunzipAsync(Buffer.from(await data.arrayBuffer()));
+  return JSON.parse(json.toString("utf8")) as T;
+}
 
 async function readProfileIndex(): Promise<ProfileIndex | null> {
   const indexPath = join(process.cwd(), ".data", "slack-profile-index.json");
-  try {
-    const details = await stat(indexPath);
-    if (!profileIndexCache || details.mtimeMs !== profileIndexModifiedAt) {
-      profileIndexCache = JSON.parse(await readFile(indexPath, "utf8")) as ProfileIndex;
-      profileIndexModifiedAt = details.mtimeMs;
+  if (process.env.DIRECTORY_DATA_SOURCE !== "remote") {
+    try {
+      const details = await stat(indexPath);
+      if (!profileIndexCache || details.mtimeMs !== profileIndexModifiedAt) {
+        profileIndexCache = JSON.parse(await readFile(indexPath, "utf8")) as ProfileIndex;
+        profileIndexModifiedAt = details.mtimeMs;
+      }
+      return profileIndexCache;
+    } catch {
+      // Deployed functions do not contain the git-ignored local snapshot.
     }
-    return profileIndexCache;
+  }
+
+  try {
+    if (remoteProfileIndexCache && Date.now() - remoteProfileIndexCachedAt < REMOTE_CACHE_TTL) {
+      return remoteProfileIndexCache;
+    }
+    remoteProfileIndexCache = await readRemoteJson<ProfileIndex>("snapshots/slack-profile-index.json.gz");
+    remoteProfileIndexCachedAt = Date.now();
+    return remoteProfileIndexCache;
   } catch {
     return null;
   }
@@ -37,16 +69,31 @@ async function readProfileIndex(): Promise<ProfileIndex | null> {
 async function readDirectory(): Promise<{ data: CacheFile; source: "slack" | "demo" }> {
   const cachePath = join(process.cwd(), ".data", "slack-users.json");
 
-  try {
-    const details = await stat(cachePath);
-    if (!memoryCache || details.mtimeMs !== memoryCacheModifiedAt) {
-      const parsed = JSON.parse(await readFile(cachePath, "utf8")) as CacheFile;
-      parsed.users = parsed.users.map((person) => ({ ...person, ...timezoneGeo(person.timezone, person.location) }));
-      memoryCache = parsed;
-      memoryCacheModifiedAt = details.mtimeMs;
+  if (process.env.DIRECTORY_DATA_SOURCE !== "remote") {
+    try {
+      const details = await stat(cachePath);
+      if (!memoryCache || details.mtimeMs !== memoryCacheModifiedAt) {
+        const parsed = JSON.parse(await readFile(cachePath, "utf8")) as CacheFile;
+        parsed.users = parsed.users.map((person) => ({ ...person, ...timezoneGeo(person.timezone, person.location) }));
+        memoryCache = parsed;
+        memoryCacheModifiedAt = details.mtimeMs;
+      }
+      return { data: memoryCache, source: "slack" };
+    } catch {
+      // Fall through to the private remote snapshot.
     }
-    return { data: memoryCache, source: "slack" };
-  } catch {
+  }
+
+  try {
+    if (!remoteDirectoryCache || Date.now() - remoteDirectoryCachedAt >= REMOTE_CACHE_TTL) {
+      const parsed = await readRemoteJson<CacheFile>("snapshots/slack-users.json.gz");
+      parsed.users = parsed.users.map((person) => ({ ...person, ...timezoneGeo(person.timezone, person.location) }));
+      remoteDirectoryCache = parsed;
+      remoteDirectoryCachedAt = Date.now();
+    }
+    return { data: remoteDirectoryCache, source: "slack" };
+  } catch (error) {
+    if (process.env.NODE_ENV === "production" || process.env.DIRECTORY_DATA_SOURCE === "remote") throw error;
     return {
       source: "demo",
       data: {
@@ -99,7 +146,15 @@ export async function GET(request: Request) {
   const auth = await getApprovedAuthContext();
   if (!auth) return Response.json({ error: "Approved account required." }, { status: 401 });
   const { searchParams } = new URL(request.url);
-  const [{ data, source }, profileIndex] = await Promise.all([readDirectory(), readProfileIndex()]);
+  let directory: Awaited<ReturnType<typeof readDirectory>>;
+  let profileIndex: ProfileIndex | null;
+  try {
+    [directory, profileIndex] = await Promise.all([readDirectory(), readProfileIndex()]);
+  } catch (error) {
+    console.error("Directory snapshot unavailable", error);
+    return Response.json({ error: "The synced directory snapshot is temporarily unavailable." }, { status: 503 });
+  }
+  const { data, source } = directory;
   const query = (searchParams.get("q") || "").trim().toLowerCase();
   const department = searchParams.get("department") || "All";
   const location = searchParams.get("location") || "All";
