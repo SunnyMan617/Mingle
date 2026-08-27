@@ -21,6 +21,8 @@ export type Person = {
   username?: string;
   statusEmoji?: string;
   hasPhoto?: boolean;
+  region?: string;
+  country?: string;
 };
 
 const skillsByDepartment: Record<string, string[]> = {

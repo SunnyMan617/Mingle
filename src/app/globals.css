@@ -67,12 +67,12 @@ a { color: inherit; text-decoration: none; }
 .filter-toggle b { width: 20px; height: 20px; border-radius: 50%; background: var(--coral); display: grid; place-items: center; font-size: 11px; }
 .toggle-chevron { transform: rotate(90deg); transition: .2s; display: grid; }
 .filter-toggle.open .toggle-chevron { transform: rotate(-90deg); }
-.filter-drawer { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 12px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .3s ease, opacity .25s, padding .3s; }
-.filter-drawer.show { max-height: 110px; opacity: 1; padding: 16px 0 3px; }
+.filter-drawer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .3s ease, opacity .25s, padding .3s; }
+.filter-drawer.show { max-height: 190px; opacity: 1; padding: 16px 0 3px; }
 .filter-drawer label { display: grid; gap: 5px; }
 .filter-drawer label span { color: var(--muted); font-size: 10px; font-weight: 750; text-transform: uppercase; letter-spacing: .8px; }
 .filter-drawer select, .sort-select select { border: 1px solid #dedad2; outline: none; border-radius: 9px; padding: 9px 32px 9px 10px; color: var(--ink); background: #fff; font-size: 12px; cursor: pointer; }
-.clear-button { align-self: end; border: 0; background: transparent; padding: 10px; color: var(--purple); font-size: 12px; font-weight: 750; cursor: pointer; }
+.clear-button { align-self: end; justify-self: start; border: 0; background: transparent; padding: 10px; color: var(--purple); font-size: 12px; font-weight: 750; cursor: pointer; }
 .clear-button:disabled { color: #b6b3ad; cursor: default; }
 .quick-filters { display: flex; gap: 4px; padding-top: 13px; overflow-x: auto; scrollbar-width: none; }
 .quick-filters::-webkit-scrollbar { display: none; }
@@ -187,7 +187,7 @@ footer > span { text-align: right; }
   .hero { min-height: 350px; }
   .hero-stats div { padding: 0 18px; }
   .filter-drawer { grid-template-columns: repeat(2, 1fr); }
-  .filter-drawer.show { max-height: 190px; }
+  .filter-drawer.show { max-height: 290px; }
   .clear-button { justify-self: start; }
   .people-grid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -208,7 +208,7 @@ footer > span { text-align: right; }
   .filter-toggle svg { width: 19px; }
   .filter-toggle b { position: absolute; margin: -32px -35px 0 0; font-size: 10px; }
   .toggle-chevron { display: none; }
-  .filter-drawer.show { max-height: 300px; }
+  .filter-drawer.show { max-height: 520px; }
   .filter-drawer { grid-template-columns: 1fr; }
   .quick-filters button { padding-left: 12px; padding-right: 12px; }
   .directory-section { padding-top: 39px; }

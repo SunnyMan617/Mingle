@@ -9,7 +9,7 @@ type Facet = { value: string; count: number };
 type DirectoryResponse = {
   people: Person[];
   pagination: { page: number; perPage: number; pageCount: number; totalCount: number };
-  facets: { departments: Facet[]; locations: Facet[] };
+  facets: { departments: Facet[]; locations: Facet[]; regions: Facet[]; countries: Facet[] };
   stats: { total: number; withTitle: number; withStatus: number };
   source: "slack" | "demo";
   workspace: string;
@@ -137,6 +137,8 @@ export function PeopleDashboard() {
   const deferredQuery = useDeferredValue(query);
   const [department, setDepartment] = useState("All");
   const [location, setLocation] = useState("All");
+  const [region, setRegion] = useState("All");
+  const [country, setCountry] = useState("All");
   const [status, setStatus] = useState<(typeof statusOptions)[number]>("All");
   const [profile, setProfile] = useState("All");
   const [sort, setSort] = useState("name-asc");
@@ -145,7 +147,7 @@ export function PeopleDashboard() {
   const [showFilters, setShowFilters] = useState(false);
   const [directoryPeople, setDirectoryPeople] = useState<Person[]>([]);
   const [pagination, setPagination] = useState({ page: 1, perPage: PER_PAGE, pageCount: 1, totalCount: 0 });
-  const [facets, setFacets] = useState<{ departments: Facet[]; locations: Facet[] }>({ departments: [], locations: [] });
+  const [facets, setFacets] = useState<{ departments: Facet[]; locations: Facet[]; regions: Facet[]; countries: Facet[] }>({ departments: [], locations: [], regions: [], countries: [] });
   const [stats, setStats] = useState({ total: 0, withTitle: 0, withStatus: 0 });
   const [source, setSource] = useState<"slack" | "demo">("slack");
   const [syncedAt, setSyncedAt] = useState("");
@@ -156,7 +158,7 @@ export function PeopleDashboard() {
     const controller = new AbortController();
     const params = new URLSearchParams({
       page: String(page), perPage: String(PER_PAGE), q: deferredQuery,
-      department, location, status, profile, sort,
+      department, location, region, country, status, profile, sort,
     });
 
     fetch(`/api/people?${params}`, { signal: controller.signal })
@@ -172,11 +174,11 @@ export function PeopleDashboard() {
         if (requestError.name !== "AbortError") { setError(requestError.message); setLoading(false); }
       });
     return () => controller.abort();
-  }, [deferredQuery, department, location, status, profile, sort, page]);
+  }, [deferredQuery, department, location, region, country, status, profile, sort, page]);
 
-  const activeFilters = [department, location, status, profile].filter((value) => value !== "All").length;
+  const activeFilters = [department, location, region, country, status, profile].filter((value) => value !== "All").length;
   const resetPage = () => setPage(1);
-  const clearFilters = () => { setQuery(""); setDepartment("All"); setLocation("All"); setStatus("All"); setProfile("All"); setSort("name-asc"); resetPage(); };
+  const clearFilters = () => { setQuery(""); setDepartment("All"); setLocation("All"); setRegion("All"); setCountry("All"); setStatus("All"); setProfile("All"); setSort("name-asc"); resetPage(); };
   const goToPage = (nextPage: number) => { setPage(nextPage); document.getElementById("directory-results")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const quickDepartments = [{ value: "All", count: stats.total }, ...facets.departments.slice(0, 6)];
 
@@ -199,6 +201,8 @@ export function PeopleDashboard() {
           </div>
           <div className={`filter-drawer ${showFilters ? "show" : ""}`}>
             <label><span>Professional group</span><select value={department} onChange={(event) => { setDepartment(event.target.value); resetPage(); }}><option>All</option>{facets.departments.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
+            <label><span>Region</span><select value={region} onChange={(event) => { setRegion(event.target.value); setCountry("All"); resetPage(); }}><option>All</option>{facets.regions.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
+            <label><span>Country</span><select value={country} onChange={(event) => { setCountry(event.target.value); resetPage(); }}><option>All</option>{facets.countries.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
             <label><span>Time zone</span><select value={location} onChange={(event) => { setLocation(event.target.value); resetPage(); }}><option>All</option>{facets.locations.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
             <label><span>Slack status</span><select value={status} onChange={(event) => { setStatus(event.target.value as typeof status); resetPage(); }}>{statusOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
             <label><span>Profile details</span><select value={profile} onChange={(event) => { setProfile(event.target.value); resetPage(); }}>{profileOptions.map((item) => <option key={item}>{item}</option>)}</select></label>

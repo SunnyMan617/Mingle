@@ -1,6 +1,7 @@
 import { stat, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { people as demoPeople, Person } from "@/data/people";
+import { timezoneGeo } from "@/lib/timezone-geo";
 
 type CacheFile = {
   syncedAt: string;
@@ -20,7 +21,9 @@ async function readDirectory(): Promise<{ data: CacheFile; source: "slack" | "de
   try {
     const details = await stat(cachePath);
     if (!memoryCache || details.mtimeMs !== memoryCacheModifiedAt) {
-      memoryCache = JSON.parse(await readFile(cachePath, "utf8")) as CacheFile;
+      const parsed = JSON.parse(await readFile(cachePath, "utf8")) as CacheFile;
+      parsed.users = parsed.users.map((person) => ({ ...person, ...timezoneGeo(person.timezone, person.location) }));
+      memoryCache = parsed;
       memoryCacheModifiedAt = details.mtimeMs;
     }
     return { data: memoryCache, source: "slack" };
@@ -31,7 +34,7 @@ async function readDirectory(): Promise<{ data: CacheFile; source: "slack" | "de
         syncedAt: "",
         workspace: "demo",
         reportedTotal: demoPeople.length,
-        users: demoPeople,
+        users: demoPeople.map((person) => ({ ...person, ...timezoneGeo(person.timezone, person.location) })),
       },
     };
   }
@@ -55,6 +58,8 @@ export async function GET(request: Request) {
   const query = (searchParams.get("q") || "").trim().toLowerCase();
   const department = searchParams.get("department") || "All";
   const location = searchParams.get("location") || "All";
+  const region = searchParams.get("region") || "All";
+  const country = searchParams.get("country") || "All";
   const status = searchParams.get("status") || "All";
   const profile = searchParams.get("profile") || "All";
   const sort = searchParams.get("sort") || "name-asc";
@@ -69,6 +74,8 @@ export async function GET(request: Request) {
     return (!query || searchable.includes(query))
       && (department === "All" || person.department === department)
       && (location === "All" || person.location === location)
+      && (region === "All" || person.region === region)
+      && (country === "All" || person.country === country)
       && (status === "All" || person.status === status)
       && (profile === "All"
         || (profile === "Has title" && person.title !== "Community member")
@@ -99,6 +106,8 @@ export async function GET(request: Request) {
     facets: {
       departments: buildFacets(data.users.map((person) => person.department), 20),
       locations: buildFacets(data.users.map((person) => person.location), 100),
+      regions: buildFacets(data.users.map((person) => person.region || "Unspecified"), 20),
+      countries: buildFacets(data.users.map((person) => person.country || "Unspecified"), 100),
     },
     stats: {
       total: data.users.length,
