@@ -11,9 +11,27 @@ type CacheFile = {
 };
 
 type Facet = { value: string; count: number };
+type ProfileFlags = { hasTitle: boolean; hasEmail: boolean; hasPhone: boolean; hasPhoto: boolean };
+type ProfileIndex = { profiles: Record<string, ProfileFlags>; complete?: boolean; indexedCount?: number };
 
 let memoryCache: CacheFile | null = null;
 let memoryCacheModifiedAt = 0;
+let profileIndexCache: ProfileIndex | null = null;
+let profileIndexModifiedAt = 0;
+
+async function readProfileIndex(): Promise<ProfileIndex | null> {
+  const indexPath = join(process.cwd(), ".data", "slack-profile-index.json");
+  try {
+    const details = await stat(indexPath);
+    if (!profileIndexCache || details.mtimeMs !== profileIndexModifiedAt) {
+      profileIndexCache = JSON.parse(await readFile(indexPath, "utf8")) as ProfileIndex;
+      profileIndexModifiedAt = details.mtimeMs;
+    }
+    return profileIndexCache;
+  } catch {
+    return null;
+  }
+}
 
 async function readDirectory(): Promise<{ data: CacheFile; source: "slack" | "demo" }> {
   const cachePath = join(process.cwd(), ".data", "slack-users.json");
@@ -54,7 +72,7 @@ function buildFacets(values: string[], limit = 100): Facet[] {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const { data, source } = await readDirectory();
+  const [{ data, source }, profileIndex] = await Promise.all([readDirectory(), readProfileIndex()]);
   const query = (searchParams.get("q") || "").trim().toLowerCase();
   const department = searchParams.get("department") || "All";
   const location = searchParams.get("location") || "All";
@@ -65,6 +83,12 @@ export async function GET(request: Request) {
   const sort = searchParams.get("sort") || "name-asc";
   const perPage = Math.max(9, Math.min(60, Number(searchParams.get("perPage")) || 30));
   const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
+  const profileFlags = (person: Person): ProfileFlags => profileIndex?.profiles[String(person.id)] || {
+    hasTitle: person.title !== "Community member",
+    hasEmail: Boolean(person.email),
+    hasPhone: Boolean(person.phone),
+    hasPhoto: person.hasPhoto ?? person.avatar.includes("avatars.slack-edge.com"),
+  };
 
   const filtered = data.users.filter((person) => {
     const searchable = [person.name, person.title, person.department, person.location, person.username, person.bio, ...person.skills]
@@ -77,11 +101,13 @@ export async function GET(request: Request) {
       && (region === "All" || person.region === region)
       && (country === "All" || person.country === country)
       && (status === "All" || person.status === status)
-      && profileFilters.every((profile) =>
-        (profile === "Has title" && person.title !== "Community member")
-        || (profile === "Has email" && Boolean(person.email))
-        || (profile === "Has phone" && Boolean(person.phone))
-        || (profile === "Has photo" && (person.hasPhoto ?? person.avatar.includes("avatars.slack-edge.com"))));
+      && profileFilters.every((profile) => {
+        const flags = profileFlags(person);
+        return (profile === "Has title" && flags.hasTitle)
+          || (profile === "Has email" && flags.hasEmail)
+          || (profile === "Has phone" && flags.hasPhone)
+          || (profile === "Has photo" && flags.hasPhoto);
+      });
   });
 
   filtered.sort((a, b) => {
@@ -117,5 +143,6 @@ export async function GET(request: Request) {
     source,
     workspace: data.workspace,
     syncedAt: data.syncedAt,
+    profileIndex: { complete: Boolean(profileIndex?.complete), indexedCount: Number(profileIndex?.indexedCount || 0) },
   });
 }
