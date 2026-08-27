@@ -19,7 +19,7 @@ type PageToken = number | "left-gap" | "right-gap";
 
 const PER_PAGE = 30;
 const statusOptions: Array<"All" | PersonStatus> = ["All", "Available", "Away"];
-const profileOptions = ["All", "Has title", "Has email", "Has phone"];
+const profileOptions = ["All", "Has title", "Has email", "Has phone", "Has photo"];
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {

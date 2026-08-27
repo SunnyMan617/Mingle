@@ -73,7 +73,8 @@ export async function GET(request: Request) {
       && (profile === "All"
         || (profile === "Has title" && person.title !== "Community member")
         || (profile === "Has email" && Boolean(person.email))
-        || (profile === "Has phone" && Boolean(person.phone)));
+        || (profile === "Has phone" && Boolean(person.phone))
+        || (profile === "Has photo" && (person.hasPhoto ?? person.avatar.includes("avatars.slack-edge.com"))));
   });
 
   filtered.sort((a, b) => {

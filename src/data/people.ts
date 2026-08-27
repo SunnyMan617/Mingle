@@ -20,6 +20,7 @@ export type Person = {
   projects: string[];
   username?: string;
   statusEmoji?: string;
+  hasPhoto?: boolean;
 };
 
 const skillsByDepartment: Record<string, string[]> = {

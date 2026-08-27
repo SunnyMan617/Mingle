@@ -125,6 +125,7 @@ function mapUser(member) {
     projects: customFields.slice(0, 2),
     username: cleanText(member.name),
     statusEmoji: cleanText(profile.status_emoji),
+    hasPhoto: Boolean(profile.image_original || (profile.avatar_hash && !String(profile.avatar_hash).startsWith("g"))),
   };
 }
 
