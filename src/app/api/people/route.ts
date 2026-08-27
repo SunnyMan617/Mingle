@@ -61,7 +61,7 @@ export async function GET(request: Request) {
   const region = searchParams.get("region") || "All";
   const country = searchParams.get("country") || "All";
   const status = searchParams.get("status") || "All";
-  const profile = searchParams.get("profile") || "All";
+  const profileFilters = (searchParams.get("profile") || "").split(",").filter(Boolean);
   const sort = searchParams.get("sort") || "name-asc";
   const perPage = Math.max(9, Math.min(60, Number(searchParams.get("perPage")) || 30));
   const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
@@ -77,8 +77,8 @@ export async function GET(request: Request) {
       && (region === "All" || person.region === region)
       && (country === "All" || person.country === country)
       && (status === "All" || person.status === status)
-      && (profile === "All"
-        || (profile === "Has title" && person.title !== "Community member")
+      && profileFilters.every((profile) =>
+        (profile === "Has title" && person.title !== "Community member")
         || (profile === "Has email" && Boolean(person.email))
         || (profile === "Has phone" && Boolean(person.phone))
         || (profile === "Has photo" && (person.hasPhoto ?? person.avatar.includes("avatars.slack-edge.com"))));

@@ -19,7 +19,7 @@ type PageToken = number | "left-gap" | "right-gap";
 
 const PER_PAGE = 30;
 const statusOptions: Array<"All" | PersonStatus> = ["All", "Available", "Away"];
-const profileOptions = ["All", "Has title", "Has email", "Has phone", "Has photo"];
+const profileOptions = ["Has title", "Has email", "Has phone", "Has photo"];
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -140,7 +140,7 @@ export function PeopleDashboard() {
   const [region, setRegion] = useState("All");
   const [country, setCountry] = useState("All");
   const [status, setStatus] = useState<(typeof statusOptions)[number]>("All");
-  const [profile, setProfile] = useState("All");
+  const [profileFilters, setProfileFilters] = useState<string[]>([]);
   const [sort, setSort] = useState("name-asc");
   const [page, setPage] = useState(1);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
@@ -158,7 +158,7 @@ export function PeopleDashboard() {
     const controller = new AbortController();
     const params = new URLSearchParams({
       page: String(page), perPage: String(PER_PAGE), q: deferredQuery,
-      department, location, region, country, status, profile, sort,
+      department, location, region, country, status, profile: profileFilters.join(","), sort,
     });
 
     fetch(`/api/people?${params}`, { signal: controller.signal })
@@ -174,11 +174,15 @@ export function PeopleDashboard() {
         if (requestError.name !== "AbortError") { setError(requestError.message); setLoading(false); }
       });
     return () => controller.abort();
-  }, [deferredQuery, department, location, region, country, status, profile, sort, page]);
+  }, [deferredQuery, department, location, region, country, status, profileFilters, sort, page]);
 
-  const activeFilters = [department, location, region, country, status, profile].filter((value) => value !== "All").length;
+  const activeFilters = [department, location, region, country, status].filter((value) => value !== "All").length + (profileFilters.length > 0 ? 1 : 0);
   const resetPage = () => setPage(1);
-  const clearFilters = () => { setQuery(""); setDepartment("All"); setLocation("All"); setRegion("All"); setCountry("All"); setStatus("All"); setProfile("All"); setSort("name-asc"); resetPage(); };
+  const clearFilters = () => { setQuery(""); setDepartment("All"); setLocation("All"); setRegion("All"); setCountry("All"); setStatus("All"); setProfileFilters([]); setSort("name-asc"); resetPage(); };
+  const toggleProfileFilter = (value: string) => {
+    setProfileFilters((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+    resetPage();
+  };
   const goToPage = (nextPage: number) => { setPage(nextPage); document.getElementById("directory-results")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const quickDepartments = [{ value: "All", count: stats.total }, ...facets.departments.slice(0, 6)];
 
@@ -205,7 +209,7 @@ export function PeopleDashboard() {
             <label><span>Country</span><select value={country} onChange={(event) => { setCountry(event.target.value); resetPage(); }}><option>All</option>{facets.countries.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
             <label><span>Time zone</span><select value={location} onChange={(event) => { setLocation(event.target.value); resetPage(); }}><option>All</option>{facets.locations.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
             <label><span>Slack status</span><select value={status} onChange={(event) => { setStatus(event.target.value as typeof status); resetPage(); }}>{statusOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label><span>Profile details</span><select value={profile} onChange={(event) => { setProfile(event.target.value); resetPage(); }}>{profileOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <div className="profile-filter"><span>Profile details</span><details className="profile-multiselect"><summary><span>{profileFilters.length === 0 ? "All profiles" : profileFilters.length === 1 ? profileFilters[0] : `${profileFilters.length} selected`}</span><Icon name="chevron" size={15} /></summary><div className="profile-options"><label><input type="checkbox" checked={profileFilters.length === 0} onChange={() => { setProfileFilters([]); resetPage(); }} /><span>All</span></label>{profileOptions.map((item) => <label key={item}><input type="checkbox" checked={profileFilters.includes(item)} onChange={() => toggleProfileFilter(item)} /><span>{item}</span></label>)}</div></details></div>
             <button className="clear-button" onClick={clearFilters} disabled={!activeFilters && !query}>Clear all</button>
           </div>
           <div className="quick-filters" aria-label="Quick professional group filters">{quickDepartments.map((item) => <button key={item.value} className={department === item.value ? "active" : ""} onClick={() => { setDepartment(item.value); resetPage(); }}>{item.value === "All" ? "Everyone" : item.value}<small>{item.count.toLocaleString()}</small></button>)}</div>
