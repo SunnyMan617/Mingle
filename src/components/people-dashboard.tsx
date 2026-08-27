@@ -225,7 +225,6 @@ export function PeopleDashboard() {
     <main className="dashboard-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Mingle home"><span className="brand-mark"><i /><i /><i /></span><span>Mingle</span></a>
-        <nav aria-label="Main navigation"><a className="active" href="#directory">Directory</a></nav>
         <div className="topbar-actions"><span className={`live-source ${source}`}><i />{source === "slack" ? "Slack synced" : "Demo data"}</span>{directoryPeople[0] && <Image src={directoryPeople[0].avatar} alt="Member profile" width={40} height={40} className="nav-avatar" />}</div>
       </header>
       <div className="page-wrap" id="top">
