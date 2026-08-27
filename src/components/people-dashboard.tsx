@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import type { Person, PersonStatus } from "@/data/people";
 
-type IconName = "search" | "chevron" | "sliders" | "pin" | "briefcase" | "mail" | "phone" | "clock" | "calendar" | "arrow" | "close" | "users" | "sparkle";
+type IconName = "search" | "chevron" | "sliders" | "pin" | "briefcase" | "mail" | "phone" | "clock" | "calendar" | "arrow" | "close" | "users" | "sparkle" | "download";
 type Facet = { value: string; count: number };
 type DirectoryResponse = {
   people: Person[];
@@ -46,6 +46,7 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     close: <><path d="m6 6 12 12M18 6 6 18" /></>,
     users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" /></>,
     sparkle: <><path d="m12 3 1.3 4.2L17.5 9l-4.2 1.8L12 15l-1.3-4.2L6.5 9l4.2-1.8L12 3Z" /><path d="m19 15 .7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7L19 15Z" /></>,
+    download: <><path d="M12 3v12m0 0 5-5m-5 5-5-5" /><path d="M5 20h14" /></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -206,6 +207,18 @@ export function PeopleDashboard() {
     resetPage();
   };
   const goToPage = (nextPage: number) => { setPage(nextPage); document.getElementById("directory-results")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const downloadCsv = () => {
+    const params = new URLSearchParams({
+      q: deferredQuery, department, location, region, country, status,
+      profile: profileFilters.join(","), sort, format: "csv",
+    });
+    const link = document.createElement("a");
+    link.href = `/api/people?${params}`;
+    link.download = `techqueria-people-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
   const quickDepartments = [{ value: "All", count: stats.total }, ...facets.departments.slice(0, 6)];
 
   return (
@@ -237,7 +250,7 @@ export function PeopleDashboard() {
           <div className="quick-filters" aria-label="Quick professional group filters">{quickDepartments.map((item) => <button key={item.value} className={department === item.value ? "active" : ""} onClick={() => { setDepartment(item.value); resetPage(); }}>{item.value === "All" ? "Everyone" : item.value}<small>{item.count.toLocaleString()}</small></button>)}</div>
         </section>
         <section className="directory-section" id="directory-results">
-          <div className="results-toolbar"><div><h2>People directory</h2><p>{pagination.totalCount.toLocaleString()} {pagination.totalCount === 1 ? "person" : "people"} found {query !== deferredQuery && <span className="searching-label">· searching…</span>}</p></div><label className="sort-select"><span>Sort by</span><select value={sort} onChange={(event) => { setSort(event.target.value); resetPage(); }}><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="department">Professional group</option><option value="title">Job title</option></select></label></div>
+          <div className="results-toolbar"><div><h2>People directory</h2><p>{pagination.totalCount.toLocaleString()} {pagination.totalCount === 1 ? "person" : "people"} found {query !== deferredQuery && <span className="searching-label">· searching…</span>}</p></div><div className="results-actions"><button className="download-button" type="button" onClick={downloadCsv} disabled={loading || Boolean(error) || pagination.totalCount === 0}><Icon name="download" size={16} /><span>Download CSV</span></button><label className="sort-select"><span>Sort by</span><select value={sort} onChange={(event) => { setSort(event.target.value); resetPage(); }}><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="department">Professional group</option><option value="title">Job title</option></select></label></div></div>
           {loading ? <LoadingGrid /> : error ? <div className="empty-state"><span><Icon name="users" size={28} /></span><h3>Could not load the directory</h3><p>{error}</p></div> : directoryPeople.length > 0 ? <div className="people-grid">{directoryPeople.map((person) => <ProfileCard key={person.id} person={person} onOpen={setSelectedPerson} />)}</div> : <div className="empty-state"><span><Icon name="users" size={28} /></span><h3>No people found</h3><p>Try a different name or loosen your filters.</p><button onClick={clearFilters}>Reset filters</button></div>}
           {!loading && !error && pagination.totalCount > 0 && <div className="pagination"><p>Showing <strong>{((pagination.page - 1) * pagination.perPage + 1).toLocaleString()}–{Math.min(pagination.page * pagination.perPage, pagination.totalCount).toLocaleString()}</strong> of {pagination.totalCount.toLocaleString()}</p><div><button className="page-arrow prev" onClick={() => goToPage(Math.max(1, pagination.page - 1))} disabled={pagination.page === 1} aria-label="Previous page"><Icon name="chevron" /></button>{pageTokens(pagination.page, pagination.pageCount).map((token) => typeof token === "number" ? <button key={token} className={token === pagination.page ? "current" : ""} onClick={() => goToPage(token)} aria-label={`Page ${token}`}>{token}</button> : <span className="page-gap" key={token}>…</span>)}<button className="page-arrow" onClick={() => goToPage(Math.min(pagination.pageCount, pagination.page + 1))} disabled={pagination.page === pagination.pageCount} aria-label="Next page"><Icon name="chevron" /></button></div></div>}
         </section>

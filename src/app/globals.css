@@ -99,10 +99,14 @@ a { color: inherit; text-decoration: none; }
 .results-toolbar h2 { margin: 0; font-family: var(--font-display), serif; font-size: 28px; letter-spacing: -.8px; font-weight: 620; }
 .results-toolbar p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
 .searching-label { color: var(--purple); }
+.results-actions { display: flex; align-items: center; gap: 10px; }
+.download-button { height: 38px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid #dcd7ee; border-radius: 9px; padding: 0 13px; background: #fff; color: var(--purple); font-size: 11px; font-weight: 750; cursor: pointer; transition: border-color .2s, background .2s; }
+.download-button:hover:not(:disabled) { border-color: var(--purple); background: #f7f5ff; }
+.download-button:disabled { opacity: .45; cursor: default; }
 .sort-select { display: flex; align-items: center; gap: 9px; }
 .sort-select span { color: var(--muted); font-size: 12px; }
 
-.people-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
+.people-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
 .profile-card { position: relative; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 17px; padding: 18px 20px 17px; background: var(--white); text-align: left; cursor: pointer; box-shadow: 0 4px 10px rgba(30,27,50,.025); transition: transform .25s ease, box-shadow .25s ease, border-color .25s; }
 .profile-card::before { content: ""; position: absolute; width: 95px; height: 95px; border-radius: 50%; top: -56px; right: -32px; background: var(--purple-soft); transition: .3s; }
 .profile-card:hover { transform: translateY(-4px); border-color: #d6d0f4; box-shadow: 0 18px 35px rgba(47,35,104,.1); }
@@ -242,6 +246,8 @@ footer > span { text-align: right; }
   .quick-filters button { padding-left: 12px; padding-right: 12px; }
   .directory-section { padding-top: 39px; }
   .sort-select span { display: none; }
+  .download-button { width: 38px; padding: 0; justify-content: center; }
+  .download-button span { display: none; }
   .people-grid { grid-template-columns: 1fr; }
   .profile-card { padding-left: 18px; padding-right: 18px; }
   .pagination { display: grid; justify-content: center; gap: 10px; }

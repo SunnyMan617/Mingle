@@ -70,6 +70,30 @@ function buildFacets(values: string[], limit = 100): Facet[] {
     .slice(0, limit);
 }
 
+function csvCell(value: string | number | boolean | undefined) {
+  const normalized = String(value ?? "").replace(/[\r\n]+/g, " ");
+  const safe = /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+function peopleCsv(people: Person[], profileFlags: (person: Person) => ProfileFlags) {
+  const columns = [
+    "Slack ID", "Name", "Job title", "Professional group", "Slack username",
+    "Region", "Country", "Time zone", "Slack status", "Status message",
+    "Email", "Phone", "Has photo",
+  ];
+  const rows = people.map((person) => {
+    const flags = profileFlags(person);
+    return [
+      person.id, person.name, person.title, person.department, person.username,
+      person.region, person.country, person.location, person.status, person.statusText,
+      person.email, person.phone, flags.hasPhoto ? "Yes" : "No",
+    ].map(csvCell).join(",");
+  });
+
+  return `\uFEFF${[columns.map(csvCell).join(","), ...rows].join("\r\n")}`;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const [{ data, source }, profileIndex] = await Promise.all([readDirectory(), readProfileIndex()]);
@@ -116,6 +140,17 @@ export async function GET(request: Request) {
     if (sort === "title") return a.title.localeCompare(b.title) || a.name.localeCompare(b.name);
     return a.name.localeCompare(b.name);
   });
+
+  if (searchParams.get("format") === "csv") {
+    return new Response(peopleCsv(filtered, profileFlags), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="techqueria-people.csv"',
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
   const page = Math.min(requestedPage, pageCount);
