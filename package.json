@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "sync:slack": "node scripts/fetch-slack-users.mjs"
+    "sync:slack": "node scripts/fetch-slack-users.mjs",
+    "session:slack": "node scripts/import-slack-session.mjs"
   },
   "dependencies": {
     "next": "16.3.3",

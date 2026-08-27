@@ -61,4 +61,12 @@ npm run sync:slack -- "C:\path\to\pasted-text.txt"
 
 The importer extracts the supplied session in memory, traverses Slack's cursor-based `users.list` endpoint, removes deleted accounts and bots, and writes sanitized dashboard fields to the local cache. The Slack token and cookie are never written to the cache or client bundle. Because `.data` is bind-mounted in the development Compose setup, a completed sync is picked up without rebuilding the image.
 
+To enable live, complete profile details when a user card is opened, import the current Slack session into the local git-ignored secret file:
+
+```bash
+npm run session:slack -- "C:\path\to\pasted-text.txt"
+```
+
+The server-side profile route uses `.slack/session.json` to request `users.profile.get`, `users.profile.getSections`, `users.profile.getExtras`, and the workspace profile schema. The secret file is available to the bind-mounted development container but is excluded from Git and Docker image builds. Re-import it when the Slack session expires.
+
 The curl payload still contains reusable Slack session credentials. Keep it outside the repository and revoke/rotate those credentials if the file has been shared.

@@ -15,6 +15,16 @@ type DirectoryResponse = {
   workspace: string;
   syncedAt: string;
 };
+type LiveProfileResponse = {
+  profile: {
+    title: string; phone: string; skype: string; realName: string; displayName: string;
+    firstName: string; lastName: string; email: string; statusText: string; statusEmoji: string;
+    statusExpiration: number; imageOriginal: string;
+  };
+  details: Array<{ id: string; label: string; type: string; section: string; value: string; displayValue: string; url: string }>;
+  sections: Array<{ label: string; count: number }>;
+  extras: { onboardingComplete: boolean; channelCount: number; sharedChannelCount: number };
+};
 type PageToken = number | "left-gap" | "right-gap";
 
 const PER_PAGE = 30;
@@ -84,6 +94,11 @@ function ProfileCard({ person, onOpen }: { person: Person; onOpen: (person: Pers
 
 function ProfileModal({ person, onClose }: { person: Person; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [liveDetails, setLiveDetails] = useState<LiveProfileResponse | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(true);
+  const [detailsError, setDetailsError] = useState("");
+  const customFields = liveDetails?.details || (person.customFields || []).map((field) => ({ ...field, section: "Additional information", displayValue: field.value, url: "" }));
+  const profile = liveDetails?.profile;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -96,6 +111,20 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
     };
   }, [onClose]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/people/${person.id}`, { signal: controller.signal })
+      .then((response) => response.json().then((data) => ({ response, data })))
+      .then(({ response, data }) => {
+        if (!response.ok) throw new Error(data.error || `Profile request failed (${response.status})`);
+        setLiveDetails(data as LiveProfileResponse); setDetailsError(""); setDetailsLoading(false);
+      })
+      .catch((requestError: Error) => {
+        if (requestError.name !== "AbortError") { setDetailsError(requestError.message); setDetailsLoading(false); }
+      });
+    return () => controller.abort();
+  }, [person.id]);
+
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-name">
@@ -104,23 +133,30 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
           <div className="modal-avatar-wrap"><Image src={person.avatar} alt={`${person.name} profile`} width={176} height={176} className="modal-avatar" priority /><span className={`avatar-status ${statusClass(person.status)}`} /></div>
           <div className="modal-heading">
             <span className={`status-label ${statusClass(person.status)}`}><i />{person.status === "Away" ? "Slack status set" : "Workspace member"}</span>
-            <h2 id="profile-name">{person.name}</h2><p>{person.title}</p><span className="modal-department">{person.department}</span>
+            <h2 id="profile-name">{profile?.displayName || person.name}</h2><p>{profile?.title || person.title}</p>
+            <div className="modal-identity">{person.username && <span>@{person.username}</span>}{(profile?.realName || person.realName) && (profile?.realName || person.realName) !== person.name && <span>{profile?.realName || person.realName}</span>}</div>
+            <span className="modal-department">{person.department}</span>
           </div>
         </div>
         <div className="modal-body">
           <div className="modal-main">
-            <div className="modal-section"><span className="eyebrow">About</span><p className="bio">{person.bio}</p></div>
+            <div className="modal-section"><span className="eyebrow">About</span>{(profile?.statusText || person.statusText) && <div className="status-callout"><span>{profile?.statusEmoji || person.statusEmoji || "●"}</span>{profile?.statusText || person.statusText}</div>}<p className="bio">{person.bio}</p></div>
             <div className="modal-section"><span className="eyebrow">Profile keywords</span><div className="modal-skills">{person.skills.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
-            {person.projects.length > 0 && <div className="modal-section"><span className="eyebrow">Additional profile details</span><div className="project-list">{person.projects.map((project, index) => <div key={`${project}-${index}`}><span>{String(index + 1).padStart(2, "0")}</span>{project}</div>)}</div></div>}
+            <div className="modal-section"><span className="eyebrow">All profile details</span>{detailsLoading ? <div className="details-loading"><i />Loading complete Slack profile…</div> : detailsError ? <div className="details-error">{detailsError}</div> : customFields.length > 0 ? <div className="profile-detail-grid">{customFields.map((field) => <div className="profile-detail" key={field.id}><small>{field.section} · {field.label}</small>{field.url ? <a href={field.url} target="_blank" rel="noreferrer">{field.displayValue}<Icon name="arrow" size={13} /></a> : <strong>{field.displayValue}</strong>}</div>)}</div> : <p className="no-details">No additional profile fields have been completed.</p>}</div>
           </div>
           <aside className="contact-panel">
             <span className="eyebrow">Contact & details</span>
-            {person.email && <a href={`mailto:${person.email}`}><span className="contact-icon"><Icon name="mail" /></span><span><small>Email</small>{person.email}</span></a>}
-            {person.phone && <a href={`tel:${person.phone}`}><span className="contact-icon"><Icon name="phone" /></span><span><small>Phone</small>{person.phone}</span></a>}
-            <div><span className="contact-icon"><Icon name="pin" /></span><span><small>Time zone</small>{person.location}</span></div>
-            {person.timezone && <div><span className="contact-icon"><Icon name="clock" /></span><span><small>Time zone ID</small>{person.timezone}</span></div>}
+            {person.username && <div><span className="contact-icon"><Icon name="users" /></span><span><small>Slack username</small>@{person.username}</span></div>}
+            {(profile?.email || person.email) && <a href={`mailto:${profile?.email || person.email}`}><span className="contact-icon"><Icon name="mail" /></span><span><small>Email</small>{profile?.email || person.email}</span></a>}
+            {(profile?.phone || person.phone) && <a href={`tel:${profile?.phone || person.phone}`}><span className="contact-icon"><Icon name="phone" /></span><span><small>Phone</small>{profile?.phone || person.phone}</span></a>}
+            {(profile?.skype || person.skype) && <div><span className="contact-icon"><Icon name="phone" /></span><span><small>Skype</small>{profile?.skype || person.skype}</span></div>}
+            <div><span className="contact-icon"><Icon name="pin" /></span><span><small>Region & country</small>{[person.region, person.country].filter((value) => value && value !== "Unspecified").join(" · ") || "Not specified"}</span></div>
+            <div><span className="contact-icon"><Icon name="clock" /></span><span><small>Time zone</small>{person.location}{person.timezone && <em>{person.timezone}</em>}</span></div>
+            {person.locale && <div><span className="contact-icon"><Icon name="users" /></span><span><small>Locale</small>{person.locale}</span></div>}
+            <div><span className="contact-icon"><Icon name="briefcase" /></span><span><small>Account type</small>{person.isUltraRestricted ? "Single-channel guest" : person.isRestricted ? "Guest" : "Full member"}</span></div>
+            {liveDetails && <div><span className="contact-icon"><Icon name="users" /></span><span><small>Profile setup</small>{liveDetails.extras.onboardingComplete ? "Onboarding complete" : "Onboarding pending"}<em>{liveDetails.extras.channelCount.toLocaleString()} visible channels · {liveDetails.extras.sharedChannelCount.toLocaleString()} shared</em></span></div>}
             <div><span className="contact-icon"><Icon name="calendar" /></span><span><small>Workspace</small>{person.joined}</span></div>
-            {person.email && <a className="message-button" href={`mailto:${person.email}`}><Icon name="mail" size={17} />Send a message</a>}
+            {(profile?.email || person.email) && <a className="message-button" href={`mailto:${profile?.email || person.email}`}><Icon name="mail" size={17} />Send a message</a>}
           </aside>
         </div>
       </section>

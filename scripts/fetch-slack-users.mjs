@@ -20,6 +20,7 @@ if (!searchUrl || !cookie || !token) {
 
 const workspaceUrl = new URL(searchUrl);
 const usersUrl = `${workspaceUrl.origin}/api/users.list`;
+const teamProfileUrl = `${workspaceUrl.origin}/api/team.profile.get`;
 const delay = (milliseconds) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 
 async function fetchUsers(cursor = "", attempt = 1) {
@@ -63,6 +64,36 @@ async function fetchUsers(cursor = "", attempt = 1) {
   }
 }
 
+async function fetchProfileSchema(attempt = 1) {
+  const form = new FormData();
+  form.append("token", token);
+
+  try {
+    const response = await fetch(teamProfileUrl, {
+      method: "POST",
+      headers: {
+        accept: "application/json, text/plain, */*",
+        cookie,
+        origin: "https://app.slack.com",
+        "user-agent": "Mozilla/5.0 SlackDirectoryImporter/1.0",
+      },
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Slack returned ok=false");
+    return data.profile?.fields || [];
+  } catch (error) {
+    if (attempt <= 4) {
+      await delay(Math.min(8_000, 750 * 2 ** attempt));
+      return fetchProfileSchema(attempt + 1);
+    }
+    console.warn(`Could not load profile field labels: ${error.message}`);
+    return [];
+  }
+}
+
 function cleanText(value) {
   return String(value || "")
     .replace(/<mailto:([^|>]+)(?:\|[^>]+)?>/g, "$1")
@@ -96,14 +127,20 @@ function inferSkills(title, department, customFields) {
   return [...new Set([...words, department, ...customFields.slice(0, 1)])].slice(0, 4);
 }
 
-function mapUser(member) {
+function mapUser(member, fieldDefinitions) {
   const profile = member.profile || {};
   const name = cleanText(profile.display_name || profile.real_name || member.real_name || member.name || member.id) || "Unnamed member";
   const title = cleanText(profile.title) || "Community member";
   const department = inferDepartment(title);
-  const customFields = Object.values(profile.fields || {})
-    .map((field) => cleanText(field?.value))
-    .filter(Boolean);
+  const customFields = Object.entries(profile.fields || {})
+    .map(([id, field]) => ({
+      id,
+      label: fieldDefinitions[id]?.label || fieldDefinitions[id]?.field_name || "Profile detail",
+      type: fieldDefinitions[id]?.type || "text",
+      value: cleanText(field?.value),
+      alt: cleanText(field?.alt),
+    }))
+    .filter((field) => field.value);
   const statusText = cleanText(profile.status_text);
 
   return {
@@ -121,10 +158,21 @@ function mapUser(member) {
     localTime: "",
     joined: "Techqueria member",
     bio: statusText || `${name} is a member of the Techqueria community.`,
-    skills: inferSkills(title, department, customFields),
-    projects: customFields.slice(0, 2),
+    skills: inferSkills(title, department, customFields.map((field) => field.value)),
+    projects: customFields.slice(0, 2).map((field) => field.value),
     username: cleanText(member.name),
     statusEmoji: cleanText(profile.status_emoji),
+    statusText,
+    statusExpiration: Number(profile.status_expiration || 0),
+    realName: cleanText(profile.real_name || member.real_name),
+    displayName: cleanText(profile.display_name),
+    firstName: cleanText(profile.first_name),
+    lastName: cleanText(profile.last_name),
+    skype: cleanText(profile.skype),
+    locale: cleanText(member.locale),
+    isRestricted: Boolean(member.is_restricted),
+    isUltraRestricted: Boolean(member.is_ultra_restricted),
+    customFields,
     hasPhoto: Boolean(profile.image_original || (profile.avatar_hash && !String(profile.avatar_hash).startsWith("g"))),
   };
 }
@@ -143,8 +191,11 @@ do {
 } while (cursor);
 
 const activeMembers = members.filter((member) => !member.deleted && !member.is_bot && member.id !== "USLACKBOT");
+const profileSchema = await fetchProfileSchema();
+const fieldDefinitions = Object.fromEntries(profileSchema.map((field) => [field.id, field]));
+console.log(`Loaded ${profileSchema.length} workspace profile field definitions`);
 const users = [...new Map(activeMembers.map((member) => {
-  const user = mapUser(member);
+  const user = mapUser(member, fieldDefinitions);
   return [user.id, user];
 })).values()].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -153,6 +204,7 @@ const output = {
   workspace: workspaceUrl.hostname.split(".")[0],
   reportedTotal: users.length,
   rawMemberTotal: members.length,
+  profileFieldCount: profileSchema.length,
   users,
 };
 

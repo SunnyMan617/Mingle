@@ -20,9 +20,20 @@ export type Person = {
   projects: string[];
   username?: string;
   statusEmoji?: string;
+  statusText?: string;
+  statusExpiration?: number;
   hasPhoto?: boolean;
   region?: string;
   country?: string;
+  realName?: string;
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  skype?: string;
+  locale?: string;
+  isRestricted?: boolean;
+  isUltraRestricted?: boolean;
+  customFields?: Array<{ id: string; label: string; type: string; value: string; alt?: string }>;
 };
 
 const skillsByDepartment: Record<string, string[]> = {
