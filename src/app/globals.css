@@ -308,6 +308,117 @@ footer > span { text-align: right; }
 .admin-empty h2 { margin: 13px 0 5px; font-family: var(--font-display), serif; }
 .admin-empty p { margin: 0; color: var(--muted); font-size: 12px; }
 
+/* Readable typography scale */
+.account-copy small,
+.account-popover-head small,
+.profile-detail small,
+.contact-panel small { font-size: 10px; }
+
+.quick-filters button small,
+.department-pill,
+.modal-department,
+.skill-row span,
+.modal-skills span,
+.eyebrow,
+.project-list span,
+.contact-panel em,
+.admin-filters small,
+.approval-identity small,
+.approval-badge { font-size: 11px; }
+
+.live-source,
+.account-copy strong,
+.filter-drawer label span,
+.profile-filter > span,
+.status-label,
+.card-meta,
+.modal-identity,
+.admin-summary span,
+.approval-actions button,
+.protected-admin { font-size: 12px; }
+
+.account-popover-head strong,
+.account-popover > a,
+.account-popover .account-signout,
+.admin-topbar .account-signout,
+.hero-stats span,
+.filter-toggle b,
+.download-button,
+.view-profile,
+.pagination p,
+.pagination button,
+footer,
+.status-callout,
+.project-list div,
+.profile-detail strong,
+.profile-detail a,
+.details-loading,
+.details-error,
+.no-details,
+.contact-panel > a > span:last-child,
+.contact-panel > div > span:last-child,
+.message-button,
+.auth-pitch > p,
+.auth-brand-panel > small > span,
+.auth-eyebrow,
+.admin-intro > div:first-child > span,
+.approval-identity p { font-size: 13px; }
+
+.kicker,
+.filter-drawer select,
+.sort-select select,
+.profile-multiselect summary,
+.filter-drawer .profile-options label span,
+.clear-button,
+.quick-filters button,
+.results-toolbar p,
+.sort-select span,
+.job-title,
+.empty-state button,
+.auth-brand-panel > small,
+.auth-form label > span,
+.auth-error,
+.auth-switch,
+.approval-state p,
+.pending-actions > a,
+.pending-signout,
+.admin-topbar > div > a,
+.admin-filters a,
+.admin-empty p { font-size: 14px; }
+
+.invite-button,
+.empty-state p,
+.bio,
+.auth-submit,
+.approval-state strong,
+.approval-identity strong { font-size: 15px; }
+
+.account-avatar,
+.filter-toggle,
+.modal-heading p,
+.auth-description,
+.auth-form input,
+.admin-intro p { font-size: 16px; }
+
+.search-box input,
+.auth-pitch > span { font-size: 17px; }
+.hero > div > p { font-size: 18px; }
+.footer-brand { font-size: 19px; }
+.approval-avatar { font-size: 20px; }
+.profile-card h3 { font-size: 22px; }
+.brand { font-size: 24px; }
+.empty-state h3 { font-size: 25px; }
+.admin-summary strong { font-size: 27px; }
+.auth-brand { font-size: 28px; }
+.results-toolbar h2 { font-size: 30px; }
+.hero-stats strong { font-size: 32px; }
+.auth-card h2 { font-size: 40px; }
+.modal-heading h2 { font-size: 43px; }
+.admin-intro h1 { font-size: 48px; }
+
+.hero h1 { font-size: clamp(51px, 5.5vw, 75px); }
+.auth-pitch h1 { font-size: clamp(50px, 4.7vw, 74px); }
+
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(18px) scale(.98); } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
@@ -321,7 +432,7 @@ footer > span { text-align: right; }
   .auth-page { grid-template-columns: 1fr; }
   .auth-brand-panel { min-height: auto; padding: 28px 36px; display: block; }
   .auth-pitch { margin-top: 46px; }
-  .auth-pitch h1 { font-size: 44px; }
+  .auth-pitch h1 { font-size: 46px; }
   .auth-brand-panel > small { margin-top: 38px; }
   .auth-content { min-height: 610px; }
   .admin-intro { align-items: flex-start; flex-direction: column; }
@@ -337,7 +448,7 @@ footer > span { text-align: right; }
 
 @media (max-width: 640px) {
   .topbar { height: 66px; padding: 0 18px; }
-  .brand { font-size: 19px; }
+  .brand { font-size: 21px; }
   .invite-button { display: none; }
   .live-source { font-size: 0; }
   .topbar-actions { gap: 7px; }
@@ -346,14 +457,14 @@ footer > span { text-align: right; }
   .account-copy, .account-menu > summary > svg { display: none; }
   .page-wrap { width: min(100% - 30px, 520px); }
   .hero { min-height: 420px; display: block; padding-top: 60px; }
-  .hero h1 { font-size: 51px; letter-spacing: -2.8px; }
+  .hero h1 { font-size: 53px; letter-spacing: -2.8px; }
   .hero-stats { margin-top: 40px; justify-content: space-around; }
   .hero-stats div { padding: 0 10px; }
   .search-panel { padding: 10px 10px 0; }
   .search-row { display: grid; grid-template-columns: 1fr 52px; gap: 8px; }
   .filter-toggle { min-width: 0; font-size: 0; }
   .filter-toggle svg { width: 19px; }
-  .filter-toggle b { position: absolute; margin: -32px -35px 0 0; font-size: 10px; }
+  .filter-toggle b { position: absolute; margin: -32px -35px 0 0; font-size: 12px; }
   .toggle-chevron { display: none; }
   .filter-drawer.show { max-height: 520px; }
   .filter-drawer { grid-template-columns: 1fr; }
@@ -372,7 +483,7 @@ footer > span { text-align: right; }
   .profile-modal { max-height: 92vh; border-radius: 21px 21px 0 0; }
   .modal-hero { min-height: 255px; padding: 35px 26px; gap: 20px; }
   .modal-avatar-wrap, .modal-avatar { width: 105px; height: 105px; }
-  .modal-heading h2 { font-size: 31px; }
+  .modal-heading h2 { font-size: 33px; }
   .modal-body { grid-template-columns: 1fr; }
   .modal-main { padding: 28px 25px; }
   .profile-detail-grid { grid-template-columns: 1fr; }
@@ -380,11 +491,11 @@ footer > span { text-align: right; }
   .auth-brand-panel { padding: 22px; }
   .auth-pitch, .auth-brand-panel > small { display: none; }
   .auth-content { min-height: calc(100vh - 74px); padding: 34px 20px; align-items: start; }
-  .auth-card h2 { font-size: 32px; }
+  .auth-card h2 { font-size: 34px; }
   .admin-topbar { height: 66px; padding: 0 16px; }
   .admin-topbar > div > a { display: none; }
   .admin-wrap { width: calc(100% - 30px); padding-top: 38px; }
-  .admin-intro h1 { font-size: 38px; }
+  .admin-intro h1 { font-size: 40px; }
   .admin-summary { width: 100%; }
   .admin-summary span { min-width: 0; flex: 1; padding: 0 10px; }
   .admin-filters { overflow-x: auto; }
