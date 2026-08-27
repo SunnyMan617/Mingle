@@ -44,6 +44,8 @@ npm run publish:directory
 
 The command gzip-compresses both snapshots before upload. The server-side directory API reads and decompresses these private objects with `SUPABASE_SECRET_KEY` when local files are unavailable. Add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and optionally `SUPABASE_DIRECTORY_BUCKET` to the Vercel project environment. The bucket is never made public. Run the publish command again after refreshing or re-indexing Slack data.
 
+Live modal enrichment additionally requires the server-only `SLACK_ORIGIN`, `SLACK_TOKEN`, and `SLACK_COOKIE` Vercel environment variables. Use the values from the git-ignored `.slack/session.json`; never prefix them with `NEXT_PUBLIC_`. These browser-session credentials expire, so replace them when Slack begins returning an authorization error. Without them, the real directory still works and the modal displays a neutral unavailable state instead of exposing a configuration error.
+
 ## Run with Docker and hot reload
 
 Build and start the development container once:

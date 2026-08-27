@@ -16,7 +16,15 @@ type SlackSection = { id: string; label?: string; order?: number };
 let schemaPromise: Promise<{ fields: SlackField[]; sections: SlackSection[] }> | null = null;
 
 async function readSession(): Promise<SlackSession> {
-  return JSON.parse(await readFile(join(process.cwd(), ".slack", "session.json"), "utf8")) as SlackSession;
+  try {
+    return JSON.parse(await readFile(join(process.cwd(), ".slack", "session.json"), "utf8")) as SlackSession;
+  } catch {
+    const origin = process.env.SLACK_ORIGIN?.trim();
+    const token = process.env.SLACK_TOKEN?.trim();
+    const cookie = process.env.SLACK_COOKIE?.trim();
+    if (origin && token && cookie) return { origin: origin.replace(/\/$/, ""), token, cookie };
+    throw new Error("Slack profile session is not configured");
+  }
 }
 
 async function slackRequest(session: SlackSession, endpoint: string, fields: Record<string, string> = {}) {
@@ -121,7 +129,7 @@ export async function GET(_request: Request, context: RouteContext<"/api/people/
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load Slack profile";
-    const missingSession = /session\.json|ENOENT/i.test(message);
+    const missingSession = /session\.json|ENOENT|session is not configured/i.test(message);
     return Response.json({ error: missingSession ? "Slack profile session is not configured" : message }, { status: missingSession ? 503 : 502 });
   }
 }

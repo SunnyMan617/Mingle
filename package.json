@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "auth:bootstrap": "node --env-file=.env scripts/bootstrap-admin.mjs",
+    "auth:confirm-approved": "node --env-file=.env scripts/confirm-approved-users.mjs",
     "publish:directory": "node --env-file=.env scripts/publish-directory-snapshot.mjs",
     "sync:slack": "node scripts/fetch-slack-users.mjs",
     "session:slack": "node scripts/import-slack-session.mjs",

@@ -30,7 +30,10 @@ export async function signInAction(_: AuthState, formData: FormData): Promise<Au
 
   const supabase = await createAuthClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error || !data.user) return { error: "The email/username or password is incorrect." };
+  if (error || !data.user) {
+    const unconfirmed = error?.code === "email_not_confirmed" || /email not confirmed/i.test(error?.message || "");
+    return { error: unconfirmed ? "Your account was approved, but the email is not confirmed yet. Ask an administrator to approve it again." : "The email/username or password is incorrect." };
+  }
 
   const { data: profile } = await supabase.from("app_profiles").select("status").eq("id", data.user.id).maybeSingle();
   if (!profile || profile.status !== "approved") redirect("/auth/pending");
