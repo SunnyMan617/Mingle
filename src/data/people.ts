@@ -2,7 +2,7 @@ export type PersonStatus = "Available" | "In a meeting" | "Away";
 export type WorkMode = "Remote" | "Hybrid" | "Office";
 
 export type Person = {
-  id: number;
+  id: number | string;
   name: string;
   title: string;
   department: string;
@@ -18,6 +18,8 @@ export type Person = {
   bio: string;
   skills: string[];
   projects: string[];
+  username?: string;
+  statusEmoji?: string;
 };
 
 const skillsByDepartment: Record<string, string[]> = {

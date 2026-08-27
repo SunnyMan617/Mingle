@@ -35,6 +35,9 @@ a { color: inherit; text-decoration: none; }
 .topbar nav a:hover, .topbar nav .active { color: var(--ink); }
 .topbar nav .active::after { content: ""; position: absolute; height: 3px; border-radius: 8px 8px 0 0; bottom: -1px; left: 0; right: 0; background: var(--purple); }
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
+.live-source { display: inline-flex; align-items: center; gap: 6px; color: #6d7385; font-size: 11px; font-weight: 720; }
+.live-source i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(37,173,118,.1); }
+.live-source.demo i { background: var(--amber); box-shadow: 0 0 0 4px rgba(228,167,66,.1); }
 .invite-button { border: 1px solid #ddd8cf; border-radius: 10px; padding: 10px 15px; background: transparent; font-size: 13px; font-weight: 700; cursor: pointer; transition: .2s; }
 .invite-button:hover { background: var(--white); border-color: var(--purple); color: var(--purple); }
 .nav-avatar { border-radius: 50%; object-fit: cover; border: 2px solid var(--white); box-shadow: 0 0 0 1px var(--line); }
@@ -74,6 +77,7 @@ a { color: inherit; text-decoration: none; }
 .quick-filters { display: flex; gap: 4px; padding-top: 13px; overflow-x: auto; scrollbar-width: none; }
 .quick-filters::-webkit-scrollbar { display: none; }
 .quick-filters button { flex: 0 0 auto; border: 0; border-bottom: 2px solid transparent; padding: 10px 16px 13px; background: transparent; color: #777d90; font-size: 12px; font-weight: 680; cursor: pointer; }
+.quick-filters button small { margin-left: 6px; color: #a3a4ae; font-size: 9px; font-weight: 650; }
 .quick-filters button:hover { color: var(--purple); }
 .quick-filters .active { color: var(--purple); border-color: var(--purple); }
 
@@ -81,6 +85,7 @@ a { color: inherit; text-decoration: none; }
 .results-toolbar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 23px; }
 .results-toolbar h2 { margin: 0; font-family: var(--font-display), serif; font-size: 28px; letter-spacing: -.8px; font-weight: 620; }
 .results-toolbar p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.searching-label { color: var(--purple); }
 .sort-select { display: flex; align-items: center; gap: 9px; }
 .sort-select span { color: var(--muted); font-size: 12px; }
 
@@ -117,6 +122,14 @@ a { color: inherit; text-decoration: none; }
 .pagination button:hover:not(:disabled), .pagination .current { border-color: var(--purple); background: var(--purple); color: #fff; }
 .pagination button:disabled { opacity: .35; cursor: default; }
 .pagination .page-arrow.prev svg { transform: rotate(180deg); }
+.page-gap { width: 26px; height: 35px; display: grid; place-items: center; color: #92919d; font-size: 13px; }
+.skeleton-card { min-height: 309px; cursor: default; display: flex; flex-direction: column; align-items: center; }
+.skeleton-line, .skeleton-avatar { display: block; border-radius: 99px; background: linear-gradient(90deg, #eeebe5 20%, #f8f6f1 45%, #eeebe5 70%); background-size: 300% 100%; animation: shimmer 1.5s ease-in-out infinite; }
+.skeleton-line { width: 48%; height: 10px; margin-top: 9px; }
+.skeleton-line.short { width: 22%; height: 18px; margin: 0; align-self: flex-start; }
+.skeleton-line.name { width: 42%; height: 17px; margin-top: 18px; }
+.skeleton-line.wide { width: 80%; height: 34px; margin-top: 25px; border-radius: 8px; }
+.skeleton-avatar { width: 86px; height: 86px; margin-top: 18px; }
 .empty-state { min-height: 320px; display: grid; place-items: center; align-content: center; text-align: center; border: 1px dashed #d8d3ca; border-radius: 17px; }
 .empty-state > span { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: var(--purple); background: var(--purple-soft); }
 .empty-state h3 { margin: 13px 0 5px; font-family: var(--font-display), serif; font-size: 23px; }
@@ -167,6 +180,7 @@ footer > span { text-align: right; }
 
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(18px) scale(.98); } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 
 @media (max-width: 900px) {
   .topbar nav { display: none; }
@@ -182,6 +196,7 @@ footer > span { text-align: right; }
   .topbar { height: 66px; padding: 0 18px; }
   .brand { font-size: 19px; }
   .invite-button { display: none; }
+  .live-source { font-size: 0; }
   .page-wrap { width: min(100% - 30px, 520px); }
   .hero { min-height: 420px; display: block; padding-top: 60px; }
   .hero h1 { font-size: 51px; letter-spacing: -2.8px; }

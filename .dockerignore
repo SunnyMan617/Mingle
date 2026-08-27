@@ -8,3 +8,5 @@ compose*.yaml
 README.md
 .env*
 !.env.example
+.data
+.slack

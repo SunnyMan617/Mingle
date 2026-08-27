@@ -51,4 +51,14 @@ The Windows scripts use Next.js with Webpack because this machine's native SWC/T
 
 ## Data
 
-Sample profiles live in `src/data/people.ts`. Replace that module with a server-side data source when connecting real workspace data. Use Slack's supported Web API with a server-only bot token and the minimum required scopes—never paste `xoxc`/`xoxd` tokens or browser cookies into client code.
+The dashboard reads the git-ignored `.data/slack-users.json` cache through the server-side `/api/people` route. The browser receives only the requested page, not the complete dataset.
+
+To refresh the directory from a newly copied Slack curl request:
+
+```bash
+npm run sync:slack -- "C:\path\to\pasted-text.txt"
+```
+
+The importer extracts the supplied session in memory, traverses Slack's cursor-based `users.list` endpoint, removes deleted accounts and bots, and writes sanitized dashboard fields to the local cache. The Slack token and cookie are never written to the cache or client bundle. Because `.data` is bind-mounted in the development Compose setup, a completed sync is picked up without rebuilding the image.
+
+The curl payload still contains reusable Slack session credentials. Keep it outside the repository and revoke/rotate those credentials if the file has been shared.
