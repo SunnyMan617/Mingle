@@ -227,7 +227,21 @@ export function PeopleDashboard({ viewer }: { viewer: { username: string; role: 
     <main className="dashboard-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Mingle home"><span className="brand-mark"><i /><i /><i /></span><span>Mingle</span></a>
-        <div className="topbar-actions"><span className={`live-source ${source}`}><i />{source === "slack" ? "Slack synced" : "Demo data"}</span>{viewer.role === "admin" && <a className="admin-link" href="/admin">Approvals</a>}<span className="viewer-name">@{viewer.username}</span><form action={signOutAction}><SignOutButton compact /></form></div>
+        <div className="topbar-actions">
+          <span className={`live-source ${source}`}><i />{source === "slack" ? "Slack synced" : "Demo data"}</span>
+          <details className="account-menu">
+            <summary aria-label={`Open account menu for ${viewer.username}`}>
+              <span className="account-avatar">{viewer.username.slice(0, 1).toUpperCase()}</span>
+              <span className="account-copy"><strong>{viewer.username}</strong><small>{viewer.role === "admin" ? "Administrator" : "Member"}</small></span>
+              <Icon name="chevron" size={14} />
+            </summary>
+            <div className="account-popover">
+              <div className="account-popover-head"><small>Signed in as</small><strong>@{viewer.username}</strong></div>
+              {viewer.role === "admin" && <a href="/admin"><Icon name="users" size={16} /><span>Manage approvals</span></a>}
+              <form action={signOutAction}><SignOutButton compact /></form>
+            </div>
+          </details>
+        </div>
       </header>
       <div className="page-wrap" id="top">
         <section className="hero" id="directory">
