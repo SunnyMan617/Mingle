@@ -22,6 +22,24 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Run with Docker and hot reload
+
+Build and start the development container once:
+
+```bash
+docker compose up --build
+```
+
+The project is bind-mounted into the container and filesystem polling is enabled, so changes under `src/`, `public/`, and other source files appear automatically through Next.js Fast Refresh. You do not need to restart Docker or rerun Compose for normal code and CSS edits.
+
+Later starts only need:
+
+```bash
+docker compose up
+```
+
+Changes to `package.json`, `package-lock.json`, `Dockerfile.dev`, or `compose.yaml` still require rebuilding the container because they change dependencies or the runtime itself.
+
 ## Verify
 
 ```bash
