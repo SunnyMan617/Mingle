@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { getApprovedAuthContext } from "@/lib/auth";
 
 type SlackSession = { origin: string; token: string; cookie: string };
 type SlackField = {
@@ -67,6 +68,8 @@ function fieldValue(rawValue: unknown, alt: unknown) {
 }
 
 export async function GET(_request: Request, context: RouteContext<"/api/people/[id]">) {
+  const auth = await getApprovedAuthContext();
+  if (!auth) return Response.json({ error: "Approved account required." }, { status: 401 });
   const { id } = await context.params;
   if (!/^[A-Z0-9]+$/i.test(id)) return Response.json({ error: "Invalid Slack user ID" }, { status: 400 });
 

@@ -7,12 +7,15 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "auth:bootstrap": "node --env-file=.env scripts/bootstrap-admin.mjs",
     "sync:slack": "node scripts/fetch-slack-users.mjs",
     "session:slack": "node scripts/import-slack-session.mjs",
     "index:profiles": "node scripts/index-slack-profile-filters.mjs",
     "seed:profile-index": "node scripts/seed-profile-index-from-search.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.111.0",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"

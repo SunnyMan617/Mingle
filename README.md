@@ -22,6 +22,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Authentication and approvals
+
+Copy the Supabase and initial administrator variables from `.env.example` into the git-ignored `.env`. Then run `supabase/auth-setup.sql` once in that Supabase project's SQL Editor and bootstrap the first approved administrator:
+
+```bash
+npm run auth:bootstrap
+```
+
+New users request access from `/auth/sign-up`. They remain on the pending screen until an approved administrator accepts them at `/admin`. Rejected and pending accounts cannot access the dashboard or its API routes.
+
+The development Compose service reads `.env` through `env_file`. Environment or dependency changes require a one-time container recreation; ordinary source and CSS changes continue to hot reload.
+
 ## Run with Docker and hot reload
 
 Build and start the development container once:

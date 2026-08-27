@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import type { Person, PersonStatus } from "@/data/people";
+import { signOutAction } from "@/app/auth/actions";
+import { SignOutButton } from "@/components/sign-out-button";
 
 type IconName = "search" | "chevron" | "sliders" | "pin" | "briefcase" | "mail" | "phone" | "clock" | "calendar" | "arrow" | "close" | "users" | "sparkle" | "download";
 type Facet = { value: string; count: number };
@@ -155,7 +157,7 @@ function LoadingGrid() {
   return <div className="people-grid" aria-label="Loading people">{Array.from({ length: 9 }, (_, index) => <div className="profile-card skeleton-card" key={index}><span className="skeleton-line short" /><span className="skeleton-avatar" /><span className="skeleton-line name" /><span className="skeleton-line" /><span className="skeleton-line wide" /></div>)}</div>;
 }
 
-export function PeopleDashboard() {
+export function PeopleDashboard({ viewer }: { viewer: { username: string; role: "admin" | "user" } }) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [department, setDepartment] = useState("All");
@@ -225,7 +227,7 @@ export function PeopleDashboard() {
     <main className="dashboard-shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Mingle home"><span className="brand-mark"><i /><i /><i /></span><span>Mingle</span></a>
-        <div className="topbar-actions"><span className={`live-source ${source}`}><i />{source === "slack" ? "Slack synced" : "Demo data"}</span>{directoryPeople[0] && <Image src={directoryPeople[0].avatar} alt="Member profile" width={40} height={40} className="nav-avatar" />}</div>
+        <div className="topbar-actions"><span className={`live-source ${source}`}><i />{source === "slack" ? "Slack synced" : "Demo data"}</span>{viewer.role === "admin" && <a className="admin-link" href="/admin">Approvals</a>}<span className="viewer-name">@{viewer.username}</span><form action={signOutAction}><SignOutButton compact /></form></div>
       </header>
       <div className="page-wrap" id="top">
         <section className="hero" id="directory">

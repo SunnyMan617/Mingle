@@ -2,6 +2,7 @@ import { stat, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { people as demoPeople, Person } from "@/data/people";
 import { timezoneGeo } from "@/lib/timezone-geo";
+import { getApprovedAuthContext } from "@/lib/auth";
 
 type CacheFile = {
   syncedAt: string;
@@ -95,6 +96,8 @@ function peopleCsv(people: Person[], profileFlags: (person: Person) => ProfileFl
 }
 
 export async function GET(request: Request) {
+  const auth = await getApprovedAuthContext();
+  if (!auth) return Response.json({ error: "Approved account required." }, { status: 401 });
   const { searchParams } = new URL(request.url);
   const [{ data, source }, profileIndex] = await Promise.all([readDirectory(), readProfileIndex()]);
   const query = (searchParams.get("q") || "").trim().toLowerCase();
