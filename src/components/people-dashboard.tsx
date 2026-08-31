@@ -6,7 +6,7 @@ import type { Person, PersonStatus } from "@/data/people";
 import { signOutAction } from "@/app/auth/actions";
 import { SignOutButton } from "@/components/sign-out-button";
 
-type IconName = "search" | "chevron" | "sliders" | "pin" | "briefcase" | "mail" | "phone" | "clock" | "calendar" | "arrow" | "close" | "users" | "sparkle" | "download";
+type IconName = "search" | "chevron" | "sliders" | "pin" | "briefcase" | "mail" | "phone" | "clock" | "calendar" | "arrow" | "close" | "users" | "sparkle" | "download" | "copy" | "check";
 type Facet = { value: string; count: number };
 type DirectoryResponse = {
   people: Person[];
@@ -49,6 +49,8 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" /></>,
     sparkle: <><path d="m12 3 1.3 4.2L17.5 9l-4.2 1.8L12 15l-1.3-4.2L6.5 9l4.2-1.8L12 3Z" /><path d="m19 15 .7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7L19 15Z" /></>,
     download: <><path d="M12 3v12m0 0 5-5m-5 5-5-5" /><path d="M5 20h14" /></>,
+    copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
+    check: <path d="m5 12 4 4L19 6" />,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -97,9 +99,11 @@ function ProfileCard({ person, onOpen }: { person: Person; onOpen: (person: Pers
 
 function ProfileModal({ person, onClose }: { person: Person; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [liveDetails, setLiveDetails] = useState<LiveProfileResponse | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(true);
   const [detailsError, setDetailsError] = useState("");
+  const [copiedFieldId, setCopiedFieldId] = useState("");
   const customFields = liveDetails?.details || (person.customFields || []).map((field) => ({ ...field, section: "Additional information", displayValue: field.value, url: "" }));
   const profile = liveDetails?.profile;
 
@@ -111,6 +115,7 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.classList.remove("modal-open");
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
     };
   }, [onClose]);
 
@@ -128,6 +133,36 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
     return () => controller.abort();
   }, [person.id]);
 
+  const copyDetail = async (fieldId: string, value: string) => {
+    let copied = false;
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+        copied = true;
+      }
+    } catch {
+      copied = false;
+    }
+
+    if (!copied) {
+      const textarea = document.createElement("textarea");
+      textarea.value = value;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      copied = document.execCommand("copy");
+      textarea.remove();
+    }
+
+    if (!copied) return;
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    setCopiedFieldId(fieldId);
+    copyResetRef.current = setTimeout(() => setCopiedFieldId(""), 1800);
+  };
+
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-name">
@@ -143,9 +178,41 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
         </div>
         <div className="modal-body">
           <div className="modal-main">
-            <div className="modal-section"><span className="eyebrow">About</span>{(profile?.statusText || person.statusText) && <div className="status-callout"><span>{profile?.statusEmoji || person.statusEmoji || "●"}</span>{profile?.statusText || person.statusText}</div>}<p className="bio">{person.bio}</p></div>
-            <div className="modal-section"><span className="eyebrow">Profile keywords</span><div className="modal-skills">{person.skills.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
-            <div className="modal-section"><span className="eyebrow">All profile details</span>{detailsLoading ? <div className="details-loading"><i />Loading complete Slack profile…</div> : customFields.length > 0 ? <div className="profile-detail-grid">{customFields.map((field) => <div className="profile-detail" key={field.id}><small>{field.section} · {field.label}</small>{field.url ? <a href={field.url} target="_blank" rel="noreferrer">{field.displayValue}<Icon name="arrow" size={13} /></a> : <strong>{field.displayValue}</strong>}</div>)}</div> : <p className="no-details">{detailsError ? "Additional Slack profile details are temporarily unavailable." : "No additional profile fields have been completed."}</p>}</div>
+            <div className="modal-summary-grid">
+              <div className="modal-summary-card">
+                <span className="eyebrow">About</span>
+                {(profile?.statusText || person.statusText) && <div className="status-callout"><span>{profile?.statusEmoji || person.statusEmoji || "●"}</span>{profile?.statusText || person.statusText}</div>}
+                <p className="bio">{person.bio}</p>
+              </div>
+              <div className="modal-summary-card">
+                <span className="eyebrow">Profile keywords</span>
+                <div className="modal-skills">{person.skills.map((skill) => <span key={skill}>{skill}</span>)}</div>
+              </div>
+            </div>
+            <div className="modal-section details-section">
+              <div className="details-heading">
+                <div><span className="eyebrow">All profile details</span><p>Use the copy button to quickly reuse any value.</p></div>
+                {!detailsLoading && customFields.length > 0 && <span className="detail-count">{customFields.length} {customFields.length === 1 ? "field" : "fields"}</span>}
+              </div>
+              {detailsLoading ? <div className="details-loading"><i />Loading complete Slack profile…</div> : customFields.length > 0 ? (
+                <div className="profile-detail-grid">
+                  {customFields.map((field) => {
+                    const copied = copiedFieldId === field.id;
+                    return (
+                      <div className="profile-detail" key={field.id}>
+                        <div className="profile-detail-head">
+                          <small>{field.section} · {field.label}</small>
+                          <button type="button" className={`copy-detail${copied ? " copied" : ""}`} onClick={() => copyDetail(field.id, field.displayValue)} aria-label={`${copied ? "Copied" : "Copy"} ${field.label}`} title={`Copy ${field.label}`}>
+                            <Icon name={copied ? "check" : "copy"} size={14} /><span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
+                          </button>
+                        </div>
+                        {field.url ? <a href={field.url} target="_blank" rel="noreferrer">{field.displayValue}<Icon name="arrow" size={14} /></a> : <strong>{field.displayValue}</strong>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : <p className="no-details">{detailsError ? "Additional Slack profile details are temporarily unavailable." : "No additional profile fields have been completed."}</p>}
+            </div>
           </div>
         </div>
       </section>
