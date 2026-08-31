@@ -16,6 +16,7 @@ type DirectoryResponse = {
   source: "slack" | "demo";
   workspace: string;
   syncedAt: string;
+  sentTrackingAvailable: boolean;
 };
 type LiveProfileResponse = {
   profile: {
@@ -79,7 +80,7 @@ function ProfileCard({ person, onOpen }: { person: Person; onOpen: (person: Pers
     <button className="profile-card" onClick={() => onOpen(person)} aria-label={`View ${person.name}'s profile`}>
       <div className="card-topline">
         <span className="department-pill">{person.department}</span>
-        <span className={`status-label ${statusClass(person.status)}`}><i />{person.status === "Away" ? "Status set" : "Member"}</span>
+        {person.isSent ? <span className="sent-badge"><Icon name="check" size={13} />Sent</span> : <span className={`status-label ${statusClass(person.status)}`}><i />{person.status === "Away" ? "Status set" : "Member"}</span>}
       </div>
       <div className="avatar-wrap">
         <Image className="avatar" src={person.avatar} alt={`${person.name} profile`} width={144} height={144} />
@@ -129,15 +130,19 @@ function ProfileDetailsEmpty({ unavailable }: { unavailable: boolean }) {
   );
 }
 
-function ProfileModal({ person, onClose }: { person: Person; onClose: () => void }) {
+function ProfileModal({ person, onClose, onSentChange, sentTrackingAvailable }: { person: Person; onClose: () => void; onSentChange: (personId: string, sent: boolean, sentAt?: string) => void; sentTrackingAvailable: boolean }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [liveDetails, setLiveDetails] = useState<LiveProfileResponse | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(true);
   const [detailsError, setDetailsError] = useState("");
   const [copiedFieldId, setCopiedFieldId] = useState("");
+  const [pendingSent, setPendingSent] = useState<boolean | null>(null);
+  const [sentSaving, setSentSaving] = useState(false);
+  const [sentError, setSentError] = useState("");
   const customFields = liveDetails?.details || (person.customFields || []).map((field) => ({ ...field, section: "Additional information", displayValue: field.value, url: "" }));
   const profile = liveDetails?.profile;
+  const displayedSent = pendingSent ?? Boolean(person.isSent);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -195,6 +200,29 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
     copyResetRef.current = setTimeout(() => setCopiedFieldId(""), 1800);
   };
 
+  const updateSentStatus = async (sent: boolean) => {
+    if (!sentTrackingAvailable || sentSaving) return;
+    setPendingSent(sent);
+    setSentSaving(true);
+    setSentError("");
+
+    try {
+      const response = await fetch(`/api/sent-users/${encodeURIComponent(String(person.id))}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sent }),
+      });
+      const data = await response.json() as { sent?: boolean; sentAt?: string | null; error?: string };
+      if (!response.ok || typeof data.sent !== "boolean") throw new Error(data.error || "Unable to update sent status.");
+      onSentChange(String(person.id), data.sent, data.sentAt || undefined);
+    } catch (updateError) {
+      setSentError(updateError instanceof Error ? updateError.message : "Unable to update sent status.");
+    } finally {
+      setPendingSent(null);
+      setSentSaving(false);
+    }
+  };
+
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-name">
@@ -205,7 +233,16 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
             <span className={`status-label ${statusClass(person.status)}`}><i />{person.status === "Away" ? "Slack status set" : "Workspace member"}</span>
             <h2 id="profile-name">{profile?.displayName || person.name}</h2><p>{profile?.title || person.title}</p>
             <div className="modal-identity">{person.username && <span>@{person.username}</span>}{(profile?.realName || person.realName) && (profile?.realName || person.realName) !== person.name && <span>{profile?.realName || person.realName}</span>}</div>
-            <span className="modal-department">{person.department}</span>
+            <div className="modal-heading-actions">
+              <span className="modal-department">{person.department}</span>
+              <label className={`modal-sent-toggle${displayedSent ? " checked" : ""}${!sentTrackingAvailable ? " unavailable" : ""}`} title={!sentTrackingAvailable ? "Run the sent-users SQL migration to enable this feature" : displayedSent ? "Unmark this user as sent" : "Mark this user as sent"}>
+                <input type="checkbox" checked={displayedSent} onChange={(event) => updateSentStatus(event.target.checked)} disabled={!sentTrackingAvailable || sentSaving} />
+                <span className="sent-toggle-box">{displayedSent && <Icon name="check" size={13} />}</span>
+                <span>{!sentTrackingAvailable ? "Sent tracking unavailable" : displayedSent ? "Marked sent" : "Mark sent"}</span>
+                {sentSaving && <i aria-hidden="true" />}
+              </label>
+            </div>
+            {sentError && <span className="sent-toggle-error" role="alert">{sentError}</span>}
           </div>
         </div>
         <div className="modal-body">
@@ -275,6 +312,7 @@ export function PeopleDashboard({ viewer }: { viewer: { username: string; role: 
   const [stats, setStats] = useState({ total: 0, withTitle: 0, withStatus: 0 });
   const [source, setSource] = useState<"slack" | "demo">("slack");
   const [syncedAt, setSyncedAt] = useState("");
+  const [sentTrackingAvailable, setSentTrackingAvailable] = useState(true);
   const [loadedRequest, setLoadedRequest] = useState("");
   const [error, setError] = useState("");
   const directoryRequest = new URLSearchParams({
@@ -293,7 +331,7 @@ export function PeopleDashboard({ viewer }: { viewer: { username: string; role: 
       })
       .then((data) => {
         setDirectoryPeople(data.people); setPagination(data.pagination); setFacets(data.facets);
-        setStats(data.stats); setSource(data.source); setSyncedAt(data.syncedAt); setError(""); setLoadedRequest(directoryRequest);
+        setStats(data.stats); setSource(data.source); setSyncedAt(data.syncedAt); setSentTrackingAvailable(data.sentTrackingAvailable); setError(""); setLoadedRequest(directoryRequest);
       })
       .catch((requestError: Error) => {
         if (requestError.name !== "AbortError") { setError(requestError.message); setLoadedRequest(directoryRequest); }
@@ -321,6 +359,11 @@ export function PeopleDashboard({ viewer }: { viewer: { username: string; role: 
     document.body.appendChild(link);
     link.click();
     link.remove();
+  };
+  const updatePersonSentStatus = (personId: string, sent: boolean, sentAt?: string) => {
+    const update = (person: Person) => String(person.id) === personId ? { ...person, isSent: sent, sentAt: sent ? sentAt : undefined } : person;
+    setDirectoryPeople((current) => current.map(update));
+    setSelectedPerson((current) => current ? update(current) : current);
   };
   const quickDepartments = [{ value: "All", count: stats.total }, ...facets.departments.slice(0, 6)];
 
@@ -377,7 +420,7 @@ export function PeopleDashboard({ viewer }: { viewer: { username: string; role: 
         </section>
       </div>
       <footer><div className="brand footer-brand"><span className="brand-mark"><i /><i /><i /></span><span>Mingle</span></div><p>{stats.total.toLocaleString()} Techqueria profiles available</p><span>{syncedAt ? `Synced ${new Date(syncedAt).toLocaleDateString()}` : "Directory not synced"}</span></footer>
-      {selectedPerson && <ProfileModal person={selectedPerson} onClose={() => setSelectedPerson(null)} />}
+      {selectedPerson && <ProfileModal person={selectedPerson} onClose={() => setSelectedPerson(null)} onSentChange={updatePersonSentStatus} sentTrackingAvailable={sentTrackingAvailable} />}
     </main>
   );
 }

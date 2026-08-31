@@ -17,6 +17,7 @@ type CacheFile = {
 type Facet = { value: string; count: number };
 type ProfileFlags = { hasTitle: boolean; hasEmail: boolean; hasPhone: boolean; hasPhoto: boolean };
 type ProfileIndex = { profiles: Record<string, ProfileFlags>; complete?: boolean; indexedCount?: number };
+type SentRow = { slack_user_id: string; marked_at: string };
 
 let memoryCache: CacheFile | null = null;
 let memoryCacheModifiedAt = 0;
@@ -104,6 +105,27 @@ async function readDirectory(): Promise<{ data: CacheFile; source: "slack" | "de
       },
     };
   }
+}
+
+async function readSentStatuses(userIds: string[]) {
+  if (userIds.length === 0) return { available: true, rows: new Map<string, string>() };
+
+  const admin = createAuthAdminClient();
+  const { data, error } = await admin
+    .from("sent_users")
+    .select("slack_user_id,marked_at")
+    .in("slack_user_id", userIds);
+
+  if (error) {
+    const missingTable = error.code === "PGRST205" || error.code === "42P01" || /sent_users|schema cache/i.test(error.message);
+    if (!missingTable) console.error("Unable to load sent-user status", { code: error.code });
+    return { available: false, rows: new Map<string, string>() };
+  }
+
+  return {
+    available: true,
+    rows: new Map((data as SentRow[]).map((row) => [row.slack_user_id, row.marked_at])),
+  };
 }
 
 function buildFacets(values: string[], limit = 100): Facet[] {
@@ -213,9 +235,15 @@ export async function GET(request: Request) {
   const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
   const page = Math.min(requestedPage, pageCount);
   const start = (page - 1) * perPage;
+  const pagePeople = filtered.slice(start, start + perPage);
+  const sentStatuses = await readSentStatuses(pagePeople.map((person) => String(person.id)));
 
   return Response.json({
-    people: filtered.slice(start, start + perPage),
+    people: pagePeople.map((person) => ({
+      ...person,
+      isSent: sentStatuses.rows.has(String(person.id)),
+      sentAt: sentStatuses.rows.get(String(person.id)),
+    })),
     pagination: {
       page,
       perPage,
@@ -236,6 +264,7 @@ export async function GET(request: Request) {
     source,
     workspace: data.workspace,
     syncedAt: data.syncedAt,
+    sentTrackingAvailable: sentStatuses.available,
     profileIndex: { complete: Boolean(profileIndex?.complete), indexedCount: Number(profileIndex?.indexedCount || 0) },
   });
 }

@@ -33,6 +33,8 @@ export type Person = {
   locale?: string;
   isRestricted?: boolean;
   isUltraRestricted?: boolean;
+  isSent?: boolean;
+  sentAt?: string;
   customFields?: Array<{ id: string; label: string; type: string; value: string; alt?: string }>;
 };
 

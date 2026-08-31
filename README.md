@@ -32,6 +32,8 @@ npm run auth:bootstrap
 
 New users request access from `/auth/sign-up`. They remain on the pending screen until an approved administrator accepts them at `/admin`. Rejected and pending accounts cannot access the dashboard or its API routes.
 
+Run `supabase/sent-users.sql` in the same Supabase SQL Editor to enable shared sent-user tracking. Approved users can mark or unmark a Slack member from the profile modal, and the status is shown on directory cards. The table stores the stable Slack user ID, the app user who marked it, and the timestamp.
+
 The development Compose service reads `.env` through `env_file`. Environment or dependency changes require a one-time container recreation; ordinary source and CSS changes continue to hot reload.
 
 ### Publish real directory data for Vercel
