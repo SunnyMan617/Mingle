@@ -97,6 +97,26 @@ function ProfileCard({ person, onOpen }: { person: Person; onOpen: (person: Pers
   );
 }
 
+function ProfileDetailsLoading() {
+  return (
+    <div className="profile-details-loading" role="status" aria-live="polite" aria-busy="true">
+      <div className="details-loading-status">
+        <span className="details-loading-mark"><Icon name="sparkle" size={16} /></span>
+        <span><strong>Loading profile details</strong><small>Syncing the latest information from Slack</small></span>
+        <i aria-hidden="true" />
+      </div>
+      <div className="profile-detail-grid details-skeleton-grid" aria-hidden="true">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div className="profile-detail detail-skeleton" key={index}>
+            <div><span /><i /></div>
+            <strong />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ProfileModal({ person, onClose }: { person: Person; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -194,7 +214,7 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
                 <div><span className="eyebrow">All profile details</span><p>Use the copy button to quickly reuse any value.</p></div>
                 {!detailsLoading && customFields.length > 0 && <span className="detail-count">{customFields.length} {customFields.length === 1 ? "field" : "fields"}</span>}
               </div>
-              {detailsLoading ? <div className="details-loading"><i />Loading complete Slack profile…</div> : customFields.length > 0 ? (
+              {detailsLoading ? <ProfileDetailsLoading /> : customFields.length > 0 ? (
                 <div className="profile-detail-grid">
                   {customFields.map((field) => {
                     const copied = copiedFieldId === field.id;
