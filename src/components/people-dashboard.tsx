@@ -221,7 +221,7 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
 }
 
 function LoadingGrid() {
-  return <div className="people-grid" aria-label="Loading people">{Array.from({ length: 9 }, (_, index) => <div className="profile-card skeleton-card" key={index}><span className="skeleton-line short" /><span className="skeleton-avatar" /><span className="skeleton-line name" /><span className="skeleton-line" /><span className="skeleton-line wide" /></div>)}</div>;
+  return <div className="people-grid" aria-busy="true"><span className="sr-only" role="status">Loading people</span>{Array.from({ length: 8 }, (_, index) => <div className="profile-card skeleton-card" aria-hidden="true" key={index}><span className="skeleton-line short" /><span className="skeleton-avatar" /><span className="skeleton-line name" /><span className="skeleton-line" /><span className="skeleton-line wide" /></div>)}</div>;
 }
 
 export function PeopleDashboard({ viewer }: { viewer: { username: string; role: "admin" | "user" } }) {
@@ -243,34 +243,36 @@ export function PeopleDashboard({ viewer }: { viewer: { username: string; role: 
   const [stats, setStats] = useState({ total: 0, withTitle: 0, withStatus: 0 });
   const [source, setSource] = useState<"slack" | "demo">("slack");
   const [syncedAt, setSyncedAt] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loadedRequest, setLoadedRequest] = useState("");
   const [error, setError] = useState("");
+  const directoryRequest = new URLSearchParams({
+    page: String(page), perPage: String(PER_PAGE), q: deferredQuery,
+    department, location, region, country, status, profile: profileFilters.join(","), sort,
+  }).toString();
+  const loading = loadedRequest !== directoryRequest;
 
   useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams({
-      page: String(page), perPage: String(PER_PAGE), q: deferredQuery,
-      department, location, region, country, status, profile: profileFilters.join(","), sort,
-    });
 
-    fetch(`/api/people?${params}`, { signal: controller.signal })
+    fetch(`/api/people?${directoryRequest}`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error(`Directory request failed (${response.status})`);
         return response.json() as Promise<DirectoryResponse>;
       })
       .then((data) => {
         setDirectoryPeople(data.people); setPagination(data.pagination); setFacets(data.facets);
-        setStats(data.stats); setSource(data.source); setSyncedAt(data.syncedAt); setError(""); setLoading(false);
+        setStats(data.stats); setSource(data.source); setSyncedAt(data.syncedAt); setError(""); setLoadedRequest(directoryRequest);
       })
       .catch((requestError: Error) => {
-        if (requestError.name !== "AbortError") { setError(requestError.message); setLoading(false); }
+        if (requestError.name !== "AbortError") { setError(requestError.message); setLoadedRequest(directoryRequest); }
       });
     return () => controller.abort();
-  }, [deferredQuery, department, location, region, country, status, profileFilters, sort, page]);
+  }, [directoryRequest]);
 
   const activeFilters = [department, location, region, country, status].filter((value) => value !== "All").length + (profileFilters.length > 0 ? 1 : 0);
   const resetPage = () => setPage(1);
-  const clearFilters = () => { setQuery(""); setDepartment("All"); setLocation("All"); setRegion("All"); setCountry("All"); setStatus("All"); setProfileFilters([]); setSort("name-asc"); resetPage(); };
+  const clearFilters = () => { setDepartment("All"); setLocation("All"); setRegion("All"); setCountry("All"); setStatus("All"); setProfileFilters([]); resetPage(); };
+  const resetDirectory = () => { setQuery(""); clearFilters(); setSort("name-asc"); };
   const toggleProfileFilter = (value: string) => {
     setProfileFilters((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
     resetPage();
@@ -321,19 +323,24 @@ export function PeopleDashboard({ viewer }: { viewer: { username: string; role: 
             <button className={`filter-toggle ${showFilters ? "open" : ""}`} onClick={() => setShowFilters(!showFilters)}><Icon name="sliders" />Filters {activeFilters > 0 && <b>{activeFilters}</b>}<span className="toggle-chevron"><Icon name="chevron" size={16} /></span></button>
           </div>
           <div className={`filter-drawer ${showFilters ? "show" : ""}`}>
-            <label><span>Professional group</span><select value={department} onChange={(event) => { setDepartment(event.target.value); resetPage(); }}><option>All</option>{facets.departments.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
-            <label><span>Region</span><select value={region} onChange={(event) => { setRegion(event.target.value); setCountry("All"); resetPage(); }}><option>All</option>{facets.regions.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
-            <label><span>Country</span><select value={country} onChange={(event) => { setCountry(event.target.value); resetPage(); }}><option>All</option>{facets.countries.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
-            <label><span>Time zone</span><select value={location} onChange={(event) => { setLocation(event.target.value); resetPage(); }}><option>All</option>{facets.locations.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
-            <label><span>Slack status</span><select value={status} onChange={(event) => { setStatus(event.target.value as typeof status); resetPage(); }}>{statusOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <div className="profile-filter"><span>Profile details</span><details className="profile-multiselect"><summary><span>{profileFilters.length === 0 ? "All profiles" : profileFilters.length === 1 ? profileFilters[0] : `${profileFilters.length} selected`}</span><Icon name="chevron" size={15} /></summary><div className="profile-options"><label><input type="checkbox" checked={profileFilters.length === 0} onChange={() => { setProfileFilters([]); resetPage(); }} /><span>All</span></label>{profileOptions.map((item) => <label key={item}><input type="checkbox" checked={profileFilters.includes(item)} onChange={() => toggleProfileFilter(item)} /><span>{item}</span></label>)}</div></details></div>
-            <button className="clear-button" onClick={clearFilters} disabled={!activeFilters && !query}>Clear all</button>
+            <div className="filter-drawer-head">
+              <div><strong>Filter directory</strong><span>{activeFilters > 0 ? `${activeFilters} active ${activeFilters === 1 ? "filter" : "filters"}` : "Choose one or more filters"}</span></div>
+              <button className="clear-button" type="button" onClick={clearFilters} disabled={activeFilters === 0}><Icon name="close" size={15} />Clear filters</button>
+            </div>
+            <div className="filter-fields">
+              <label><span>Professional group</span><select value={department} onChange={(event) => { setDepartment(event.target.value); resetPage(); }}><option>All</option>{facets.departments.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
+              <label><span>Region</span><select value={region} onChange={(event) => { setRegion(event.target.value); setCountry("All"); resetPage(); }}><option>All</option>{facets.regions.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
+              <label><span>Country</span><select value={country} onChange={(event) => { setCountry(event.target.value); resetPage(); }}><option>All</option>{facets.countries.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
+              <label><span>Time zone</span><select value={location} onChange={(event) => { setLocation(event.target.value); resetPage(); }}><option>All</option>{facets.locations.map((item) => <option key={item.value} value={item.value}>{item.value} ({item.count.toLocaleString()})</option>)}</select></label>
+              <label><span>Slack status</span><select value={status} onChange={(event) => { setStatus(event.target.value as typeof status); resetPage(); }}>{statusOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+              <div className="profile-filter"><span>Profile details</span><details className="profile-multiselect"><summary><span>{profileFilters.length === 0 ? "All profiles" : profileFilters.length === 1 ? profileFilters[0] : `${profileFilters.length} selected`}</span><Icon name="chevron" size={15} /></summary><div className="profile-options"><label><input type="checkbox" checked={profileFilters.length === 0} onChange={() => { setProfileFilters([]); resetPage(); }} /><span>All</span></label>{profileOptions.map((item) => <label key={item}><input type="checkbox" checked={profileFilters.includes(item)} onChange={() => toggleProfileFilter(item)} /><span>{item}</span></label>)}</div></details></div>
+            </div>
           </div>
           <div className="quick-filters" aria-label="Quick professional group filters">{quickDepartments.map((item) => <button key={item.value} className={department === item.value ? "active" : ""} onClick={() => { setDepartment(item.value); resetPage(); }}>{item.value === "All" ? "Everyone" : item.value}<small>{item.count.toLocaleString()}</small></button>)}</div>
         </section>
         <section className="directory-section" id="directory-results">
           <div className="results-toolbar"><div><h2>People directory</h2><p>{pagination.totalCount.toLocaleString()} {pagination.totalCount === 1 ? "person" : "people"} found {query !== deferredQuery && <span className="searching-label">· searching…</span>}</p></div><div className="results-actions"><button className="download-button" type="button" onClick={downloadCsv} disabled={loading || Boolean(error) || pagination.totalCount === 0}><Icon name="download" size={16} /><span>Download CSV</span></button><label className="sort-select"><span>Sort by</span><select value={sort} onChange={(event) => { setSort(event.target.value); resetPage(); }}><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="department">Professional group</option><option value="title">Job title</option></select></label></div></div>
-          {loading ? <LoadingGrid /> : error ? <div className="empty-state"><span><Icon name="users" size={28} /></span><h3>Could not load the directory</h3><p>{error}</p></div> : directoryPeople.length > 0 ? <div className="people-grid">{directoryPeople.map((person) => <ProfileCard key={person.id} person={person} onOpen={setSelectedPerson} />)}</div> : <div className="empty-state"><span><Icon name="users" size={28} /></span><h3>No people found</h3><p>Try a different name or loosen your filters.</p><button onClick={clearFilters}>Reset filters</button></div>}
+          {loading ? <LoadingGrid /> : error ? <div className="empty-state"><span><Icon name="users" size={28} /></span><h3>Could not load the directory</h3><p>{error}</p></div> : directoryPeople.length > 0 ? <div className="people-grid">{directoryPeople.map((person) => <ProfileCard key={person.id} person={person} onOpen={setSelectedPerson} />)}</div> : <div className="empty-state"><span><Icon name="users" size={28} /></span><h3>No people found</h3><p>Try a different name or loosen your filters.</p><button onClick={resetDirectory}>Reset search and filters</button></div>}
           {!loading && !error && pagination.totalCount > 0 && <div className="pagination"><p>Showing <strong>{((pagination.page - 1) * pagination.perPage + 1).toLocaleString()}–{Math.min(pagination.page * pagination.perPage, pagination.totalCount).toLocaleString()}</strong> of {pagination.totalCount.toLocaleString()}</p><div><button className="page-arrow prev" onClick={() => goToPage(Math.max(1, pagination.page - 1))} disabled={pagination.page === 1} aria-label="Previous page"><Icon name="chevron" /></button>{pageTokens(pagination.page, pagination.pageCount).map((token) => typeof token === "number" ? <button key={token} className={token === pagination.page ? "current" : ""} onClick={() => goToPage(token)} aria-label={`Page ${token}`}>{token}</button> : <span className="page-gap" key={token}>…</span>)}<button className="page-arrow" onClick={() => goToPage(Math.min(pagination.pageCount, pagination.page + 1))} disabled={pagination.page === pagination.pageCount} aria-label="Next page"><Icon name="chevron" /></button></div></div>}
         </section>
       </div>
