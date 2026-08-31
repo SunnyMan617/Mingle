@@ -18,6 +18,19 @@ type Facet = { value: string; count: number };
 type ProfileFlags = { hasTitle: boolean; hasEmail: boolean; hasPhone: boolean; hasPhoto: boolean };
 type ProfileIndex = { profiles: Record<string, ProfileFlags>; complete?: boolean; indexedCount?: number };
 type SentRow = { slack_user_id: string; marked_at: string };
+type ProfileDetailField = {
+  id: string; label: string; type: string; section: string; value: string; displayValue: string; url: string;
+  sectionOrder?: number; order?: number;
+};
+type DetailedProfile = {
+  title?: string; phone?: string; skype?: string; realName?: string; displayName?: string;
+  firstName?: string; lastName?: string; email?: string; statusText?: string; statusEmoji?: string;
+  locale?: string; details?: ProfileDetailField[];
+};
+type ProfileDetailsSnapshot = {
+  syncedAt?: string; total?: number; indexedCount?: number; complete?: boolean;
+  profiles: Record<string, DetailedProfile>;
+};
 
 let memoryCache: CacheFile | null = null;
 let memoryCacheModifiedAt = 0;
@@ -27,6 +40,10 @@ let remoteDirectoryCache: CacheFile | null = null;
 let remoteDirectoryCachedAt = 0;
 let remoteProfileIndexCache: ProfileIndex | null = null;
 let remoteProfileIndexCachedAt = 0;
+let profileDetailsCache: ProfileDetailsSnapshot | null = null;
+let profileDetailsModifiedAt = 0;
+let remoteProfileDetailsCache: ProfileDetailsSnapshot | null = null;
+let remoteProfileDetailsCachedAt = 0;
 
 const DIRECTORY_BUCKET = process.env.SUPABASE_DIRECTORY_BUCKET || "mingle-directory-data";
 const REMOTE_CACHE_TTL = 5 * 60 * 1000;
@@ -62,6 +79,33 @@ async function readProfileIndex(): Promise<ProfileIndex | null> {
     remoteProfileIndexCache = await readRemoteJson<ProfileIndex>("snapshots/slack-profile-index.json.gz");
     remoteProfileIndexCachedAt = Date.now();
     return remoteProfileIndexCache;
+  } catch {
+    return null;
+  }
+}
+
+async function readProfileDetails(): Promise<ProfileDetailsSnapshot | null> {
+  const detailsPath = join(process.cwd(), ".data", "slack-profile-details.json");
+  if (process.env.DIRECTORY_DATA_SOURCE !== "remote") {
+    try {
+      const details = await stat(detailsPath);
+      if (!profileDetailsCache || details.mtimeMs !== profileDetailsModifiedAt) {
+        profileDetailsCache = JSON.parse(await readFile(detailsPath, "utf8")) as ProfileDetailsSnapshot;
+        profileDetailsModifiedAt = details.mtimeMs;
+      }
+      return profileDetailsCache;
+    } catch {
+      // Deployed functions do not contain the git-ignored local snapshot.
+    }
+  }
+
+  try {
+    if (remoteProfileDetailsCache && Date.now() - remoteProfileDetailsCachedAt < REMOTE_CACHE_TTL) {
+      return remoteProfileDetailsCache;
+    }
+    remoteProfileDetailsCache = await readRemoteJson<ProfileDetailsSnapshot>("snapshots/slack-profile-details.json.gz");
+    remoteProfileDetailsCachedAt = Date.now();
+    return remoteProfileDetailsCache;
   } catch {
     return null;
   }
@@ -146,18 +190,45 @@ function csvCell(value: string | number | boolean | undefined) {
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
-function peopleCsv(people: Person[], profileFlags: (person: Person) => ProfileFlags) {
+function peopleCsv(people: Person[], profileFlags: (person: Person) => ProfileFlags, detailsSnapshot: ProfileDetailsSnapshot | null) {
+  const detailProfiles = detailsSnapshot?.profiles || {};
+  const customFields = new Map<string, { header: string; sectionOrder: number; order: number }>();
+
+  for (const person of people) {
+    for (const field of detailProfiles[String(person.id)]?.details || []) {
+      if (!customFields.has(field.id)) {
+        customFields.set(field.id, {
+          header: `${field.section || "Additional information"} · ${field.label || "Profile detail"}`,
+          sectionOrder: Number(field.sectionOrder || 99),
+          order: Number(field.order || 99),
+        });
+      }
+    }
+  }
+
+  const orderedCustomFields = [...customFields.entries()].sort(([, a], [, b]) =>
+    a.sectionOrder - b.sectionOrder || a.order - b.order || a.header.localeCompare(b.header));
   const columns = [
-    "Slack ID", "Name", "Job title", "Professional group", "Slack username",
-    "Region", "Country", "Time zone", "Slack status", "Status message",
-    "Email", "Phone", "Has photo",
+    "Slack ID", "Name", "Real name", "Display name", "First name", "Last name",
+    "Job title", "Professional group", "Slack username", "Region", "Country", "Time zone",
+    "Slack status", "Status message", "Status emoji", "Email", "Phone", "Skype", "Locale", "Has photo",
+    ...orderedCustomFields.map(([, field]) => field.header),
   ];
   const rows = people.map((person) => {
     const flags = profileFlags(person);
+    const details = detailProfiles[String(person.id)];
+    const customValues = new Map((details?.details || []).map((field) => [field.id, field.displayValue || field.value]));
+    const namedCustomValues = new Map((details?.details || []).map((field) => [field.label.trim().toLowerCase(), field.displayValue || field.value]));
     return [
-      person.id, person.name, person.title, person.department, person.username,
-      person.region, person.country, person.location, person.status, person.statusText,
-      person.email, person.phone, flags.hasPhoto ? "Yes" : "No",
+      person.id, person.name, details?.realName || person.realName, details?.displayName || person.displayName,
+      details?.firstName || person.firstName, details?.lastName || person.lastName,
+      details?.title || namedCustomValues.get("title") || person.title, person.department, person.username,
+      person.region, person.country, person.location, person.status,
+      details?.statusText || person.statusText, details?.statusEmoji || person.statusEmoji,
+      details?.email || namedCustomValues.get("email") || person.email,
+      details?.phone || namedCustomValues.get("phone") || person.phone, details?.skype || person.skype,
+      details?.locale || person.locale, flags.hasPhoto ? "Yes" : "No",
+      ...orderedCustomFields.map(([fieldId]) => customValues.get(fieldId) || ""),
     ].map(csvCell).join(",");
   });
 
@@ -222,12 +293,14 @@ export async function GET(request: Request) {
   });
 
   if (searchParams.get("format") === "csv") {
-    return new Response(peopleCsv(filtered, profileFlags), {
+    const profileDetails = await readProfileDetails();
+    return new Response(peopleCsv(filtered, profileFlags, profileDetails), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="techqueria-people.csv"',
+        "Content-Disposition": 'attachment; filename="techqueria-people-detailed.csv"',
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
+        "X-Mingle-Profile-Details": profileDetails?.complete ? "complete" : profileDetails ? "partial" : "unavailable",
       },
     });
   }

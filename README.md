@@ -44,7 +44,16 @@ Vercel cannot access the git-ignored local `.data` files. Publish the current sa
 npm run publish:directory
 ```
 
-The command gzip-compresses both snapshots before upload. The server-side directory API reads and decompresses these private objects with `SUPABASE_SECRET_KEY` when local files are unavailable. Add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and optionally `SUPABASE_DIRECTORY_BUCKET` to the Vercel project environment. The bucket is never made public. Run the publish command again after refreshing or re-indexing Slack data.
+The command gzip-compresses the directory, filter index, and detailed-profile snapshots before upload. The server-side directory API reads and decompresses these private objects with `SUPABASE_SECRET_KEY` when local files are unavailable. Add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and optionally `SUPABASE_DIRECTORY_BUCKET` to the Vercel project environment. The bucket is never made public. Run the publish command again after refreshing or re-indexing Slack data.
+
+For detailed CSV exports, build the private profile-detail snapshot before publishing:
+
+```bash
+npm run sync:profile-details
+npm run publish:directory
+```
+
+The sync walks Slack people-search pages with retry and rate-limit handling, then fills any missing members through the direct profile endpoint. It stores standard fields such as email and phone plus every completed custom profile field in `.data/slack-profile-details.json`. The file is git-ignored and uploaded only to the private Storage bucket. CSV downloads join this snapshot to the current filtered directory instead of making thousands of live Slack requests inside a Vercel function.
 
 Live modal enrichment additionally requires the server-only `SLACK_ORIGIN`, `SLACK_TOKEN`, and `SLACK_COOKIE` Vercel environment variables. Use the values from the git-ignored `.slack/session.json`; never prefix them with `NEXT_PUBLIC_`. These browser-session credentials expire, so replace them when Slack begins returning an authorization error. Without them, the real directory still works and the modal displays a neutral unavailable state instead of exposing a configuration error.
 

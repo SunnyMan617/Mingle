@@ -13,7 +13,8 @@
     "sync:slack": "node scripts/fetch-slack-users.mjs",
     "session:slack": "node scripts/import-slack-session.mjs",
     "index:profiles": "node scripts/index-slack-profile-filters.mjs",
-    "seed:profile-index": "node scripts/seed-profile-index-from-search.mjs"
+    "seed:profile-index": "node scripts/seed-profile-index-from-search.mjs",
+    "sync:profile-details": "node scripts/seed-profile-index-from-search.mjs && node scripts/index-slack-profile-filters.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

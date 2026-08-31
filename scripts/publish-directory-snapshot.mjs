@@ -16,6 +16,7 @@ if (!url || !secret) throw new Error("Set SUPABASE_URL and SUPABASE_SECRET_KEY b
 const snapshots = [
   { local: join(process.cwd(), ".data", "slack-users.json"), remote: "snapshots/slack-users.json.gz" },
   { local: join(process.cwd(), ".data", "slack-profile-index.json"), remote: "snapshots/slack-profile-index.json.gz" },
+  { local: join(process.cwd(), ".data", "slack-profile-details.json"), remote: "snapshots/slack-profile-details.json.gz" },
 ];
 
 for (const snapshot of snapshots) {
