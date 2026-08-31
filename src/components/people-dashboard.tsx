@@ -117,6 +117,18 @@ function ProfileDetailsLoading() {
   );
 }
 
+function ProfileDetailsEmpty({ unavailable }: { unavailable: boolean }) {
+  return (
+    <div className={`profile-details-empty${unavailable ? " unavailable" : ""}`} role={unavailable ? "alert" : undefined}>
+      <span className="profile-details-empty-icon"><Icon name={unavailable ? "users" : "sparkle"} size={20} /></span>
+      <div>
+        <strong>{unavailable ? "Profile details unavailable" : "No additional details yet"}</strong>
+        <p>{unavailable ? "We couldn’t load the latest Slack fields. Try opening this profile again in a moment." : "This member hasn’t added any custom fields to their Slack profile."}</p>
+      </div>
+    </div>
+  );
+}
+
 function ProfileModal({ person, onClose }: { person: Person; onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -211,7 +223,7 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
             </div>
             <div className="modal-section details-section">
               <div className="details-heading">
-                <div><span className="eyebrow">All profile details</span><p>Use the copy button to quickly reuse any value.</p></div>
+                <div><span className="eyebrow">All profile details</span><p>{detailsLoading ? "Syncing the latest information from Slack." : customFields.length > 0 ? "Use the copy button to quickly reuse any value." : detailsError ? "The latest Slack profile information could not be retrieved." : "Custom Slack profile fields will appear here."}</p></div>
                 {!detailsLoading && customFields.length > 0 && <span className="detail-count">{customFields.length} {customFields.length === 1 ? "field" : "fields"}</span>}
               </div>
               {detailsLoading ? <ProfileDetailsLoading /> : customFields.length > 0 ? (
@@ -231,7 +243,7 @@ function ProfileModal({ person, onClose }: { person: Person; onClose: () => void
                     );
                   })}
                 </div>
-              ) : <p className="no-details">{detailsError ? "Additional Slack profile details are temporarily unavailable." : "No additional profile fields have been completed."}</p>}
+              ) : <ProfileDetailsEmpty unavailable={Boolean(detailsError)} />}
             </div>
           </div>
         </div>

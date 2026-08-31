@@ -249,8 +249,12 @@ footer > span { text-align: right; }
 .detail-skeleton span { width: 34%; height: 8px; }
 .detail-skeleton i { width: 28px; height: 24px; border-radius: 7px; }
 .detail-skeleton > strong { width: 62%; height: 12px; margin: 12px 0 0; }
-.details-error, .no-details { min-height: 56px; margin: 0; border-radius: 10px; display: flex; align-items: center; gap: 9px; padding: 12px 14px; background: #f6f3ed; color: #73798b; font-size: 11px; }
-.details-error { background: #fff1ef; color: #a64d48; }
+.profile-details-empty { min-height: 140px; padding: 24px; border: 1px dashed #d8d2e5; border-radius: 13px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px; color: #62697e; background: linear-gradient(145deg, #faf9f6, #f7f5fb); text-align: center; }
+.profile-details-empty-icon { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; color: var(--purple); background: #ebe8fb; box-shadow: 0 6px 16px rgba(64,49,132,.08); }
+.profile-details-empty strong { display: block; color: #3b4358; font-size: 15px; }
+.profile-details-empty p { max-width: 520px; margin: 5px 0 0; color: #777d90; font-size: 13px; line-height: 1.5; }
+.profile-details-empty.unavailable { border-style: solid; border-color: #efd7d2; background: linear-gradient(145deg, #fff9f7, #faf6f3); }
+.profile-details-empty.unavailable .profile-details-empty-icon { color: #a8544c; background: #fcebe8; box-shadow: 0 6px 16px rgba(145,68,60,.07); }
 .contact-panel { padding: 32px 28px; background: #f5f2ec; border-left: 1px solid #e9e5de; }
 .contact-panel > a, .contact-panel > div { display: flex; align-items: center; gap: 11px; padding: 10px 0; }
 .contact-icon { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 9px; background: #fff; color: var(--purple); box-shadow: 0 2px 7px rgba(40,30,70,.06); }
@@ -390,9 +394,6 @@ footer,
 .project-list div,
 .profile-detail strong,
 .profile-detail a,
-.details-loading,
-.details-error,
-.no-details,
 .contact-panel > a > span:last-child,
 .contact-panel > div > span:last-child,
 .message-button,
