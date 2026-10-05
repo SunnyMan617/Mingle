@@ -73,7 +73,7 @@ function urlOf(value: unknown): string {
 }
 
 function isHidden(value: Record<string, unknown>) {
-  return value.hidden === true || value.is_hidden === true || value.isHidden === true;
+  return value.hidden === true || value.is_hidden === true || value.isHidden === true || value.isMissing === true;
 }
 
 function sectionElements(section: Record<string, unknown>) {
@@ -161,15 +161,15 @@ export function extractProfileSections(payload: unknown): Record<string, unknown
 function detailFromElement(element: Record<string, unknown>, sectionLabel: string, sectionOrder: number, index: number): ProfileDetail | null {
   if (isHidden(element)) return null;
   const nested = [element.field, element.profileField, element.profile_field, element.item, element.element].find(isRecord) || {};
-  const rawValue = element.value ?? element.text ?? element.displayValue ?? nested.value ?? nested.text ?? nested.displayValue ?? element.alt ?? nested.alt;
-  const alt = element.alt ?? nested.alt ?? element.displayValue ?? nested.displayValue ?? element.display_value ?? nested.display_value;
+  const rawValue = element.value ?? element.text ?? element.uri ?? element.date ?? element.displayText ?? element.displayValue ?? nested.value ?? nested.text ?? nested.displayValue ?? element.alt ?? nested.alt;
+  const alt = element.displayText ?? element.alt ?? nested.alt ?? element.displayValue ?? nested.displayValue ?? element.display_value ?? nested.display_value;
   const normalized = fieldValue(typeof rawValue === "string" ? rawValue : textOf(rawValue), typeof alt === "string" ? alt : textOf(alt));
-  const displayValue = normalized.displayValue || textOf(element.displayValue) || textOf(element.display_value) || textOf(element.text) || textOf(nested.text);
+  const displayValue = normalized.displayValue || textOf(element.displayText) || textOf(element.displayValue) || textOf(element.display_value) || textOf(element.text) || textOf(element.uri) || textOf(element.date) || textOf(nested.text);
   if (!displayValue) return null;
 
   const label = textOf(element.label) || textOf(nested.label) || textOf(element.field_name) || textOf(nested.field_name) || textOf(element.fieldName) || "Profile detail";
-  const id = cleanText(element.id ?? nested.id ?? element.field_id ?? nested.field_id ?? element.fieldId ?? nested.fieldId ?? `${sectionLabel}:${label}:${index}`);
-  const url = normalized.url || urlOf(element) || urlOf(nested) || urlOf(rawValue);
+  const id = cleanText(element.legacyFieldId ?? element.elementId ?? element.id ?? nested.id ?? element.field_id ?? nested.field_id ?? element.fieldId ?? nested.fieldId ?? `${sectionLabel}:${label}:${index}`);
+  const url = cleanText(element.uri) || normalized.url || urlOf(element) || urlOf(nested) || urlOf(rawValue);
 
   return {
     id: id || `${sectionLabel}:${index}`,

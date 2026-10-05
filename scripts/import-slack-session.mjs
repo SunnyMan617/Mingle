@@ -18,23 +18,14 @@ if (!requestUrl || !cookie || !token) {
   throw new Error("Could not find the Slack URL, cookie, and token in the curl payload.");
 }
 
-const decodedCookie = cookie.split("; ").map((part) => {
-  const index = part.indexOf("=");
-  if (index === -1) return part;
-  const key = part.slice(0, index);
-  const value = part.slice(index + 1);
-  try {
-    return `${key}=${decodeURIComponent(value)}`;
-  } catch {
-    return part;
-  }
-}).join("; ");
+const importedUrl = new URL(requestUrl);
 
 await mkdir(dirname(outputPath), { recursive: true });
 await writeFile(outputPath, JSON.stringify({
-  origin: new URL(requestUrl).origin,
+  origin: importedUrl.origin,
   token,
-  cookie: decodedCookie,
+  cookie,
+  slackRoute: importedUrl.searchParams.get("slack_route") || "",
   importedAt: new Date().toISOString(),
 }), { encoding: "utf8", mode: 0o600 });
 

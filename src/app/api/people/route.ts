@@ -229,7 +229,7 @@ function peopleCsv(people: Person[], detailsSnapshot: ProfileDetailsSnapshot | n
     const namedCustomValues = new Map((details?.details || []).map((field) => [field.label.trim().toLowerCase(), field.displayValue || field.value]));
     return [
       person.name,
-      details?.email || namedCustomValues.get("email") || person.email,
+      details?.email || namedCustomValues.get("email") || namedCustomValues.get("email address") || person.email,
       details?.phone || namedCustomValues.get("phone") || person.phone,
       details?.title || namedCustomValues.get("title") || person.title,
       customFieldValue(person, details, ["company", "organization", "employer", "workplace"]),
