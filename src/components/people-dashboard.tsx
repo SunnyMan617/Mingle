@@ -33,6 +33,63 @@ type PageToken = number | "left-gap" | "right-gap";
 const PER_PAGE = 30;
 const statusOptions: Array<"All" | PersonStatus> = ["All", "Available", "Away"];
 const profileOptions = ["Has title", "Has email", "Has phone", "Has photo"];
+const sortOptions = ["name-asc", "name-desc", "department", "title"] as const;
+
+type SearchRecord = Record<string, string | string[] | undefined>;
+type DirectoryState = {
+  query: string;
+  department: string;
+  location: string;
+  region: string;
+  country: string;
+  status: (typeof statusOptions)[number];
+  profileFilters: string[];
+  sort: string;
+  page: number;
+};
+
+function firstSearchValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] || "" : value || "";
+}
+
+function directoryStateFromParams(params: URLSearchParams): DirectoryState {
+  const status = params.get("status") || "All";
+  const sort = params.get("sort") || "name-asc";
+  return {
+    query: params.get("q") || "",
+    department: params.get("department") || "All",
+    location: params.get("location") || "All",
+    region: params.get("region") || "All",
+    country: params.get("country") || "All",
+    status: statusOptions.includes(status as DirectoryState["status"]) ? status as DirectoryState["status"] : "All",
+    profileFilters: (params.get("profile") || "").split(",").filter((item) => profileOptions.includes(item)),
+    sort: (sortOptions as readonly string[]).includes(sort) ? sort : "name-asc",
+    page: Math.max(1, Number(params.get("page")) || 1),
+  };
+}
+
+function directoryStateFromSearch(search: SearchRecord) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    const text = firstSearchValue(value);
+    if (text) params.set(key, text);
+  }
+  return directoryStateFromParams(params);
+}
+
+function directoryParamsFromState(state: DirectoryState) {
+  const params = new URLSearchParams();
+  if (state.query.trim()) params.set("q", state.query);
+  if (state.department !== "All") params.set("department", state.department);
+  if (state.location !== "All") params.set("location", state.location);
+  if (state.region !== "All") params.set("region", state.region);
+  if (state.country !== "All") params.set("country", state.country);
+  if (state.status !== "All") params.set("status", state.status);
+  if (state.profileFilters.length > 0) params.set("profile", state.profileFilters.join(","));
+  if (state.sort !== "name-asc") params.set("sort", state.sort);
+  if (state.page > 1) params.set("page", String(state.page));
+  return params;
+}
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, React.ReactNode> = {
@@ -293,19 +350,23 @@ function LoadingGrid() {
   return <div className="people-grid" aria-busy="true"><span className="sr-only" role="status">Loading people</span>{Array.from({ length: 8 }, (_, index) => <div className="profile-card skeleton-card" aria-hidden="true" key={index}><span className="skeleton-line short" /><span className="skeleton-avatar" /><span className="skeleton-line name" /><span className="skeleton-line" /><span className="skeleton-line wide" /></div>)}</div>;
 }
 
-export function PeopleDashboard({ viewer }: { viewer: { username: string; role: "admin" | "user" } }) {
-  const [query, setQuery] = useState("");
+export function PeopleDashboard({ viewer, initialSearch = {} }: { viewer: { username: string; role: "admin" | "user" }; initialSearch?: SearchRecord }) {
+  const initialDirectory = directoryStateFromSearch(initialSearch);
+  const [query, setQuery] = useState(initialDirectory.query);
   const deferredQuery = useDeferredValue(query);
-  const [department, setDepartment] = useState("All");
-  const [location, setLocation] = useState("All");
-  const [region, setRegion] = useState("All");
-  const [country, setCountry] = useState("All");
-  const [status, setStatus] = useState<(typeof statusOptions)[number]>("All");
-  const [profileFilters, setProfileFilters] = useState<string[]>([]);
-  const [sort, setSort] = useState("name-asc");
-  const [page, setPage] = useState(1);
+  const [department, setDepartment] = useState(initialDirectory.department);
+  const [location, setLocation] = useState(initialDirectory.location);
+  const [region, setRegion] = useState(initialDirectory.region);
+  const [country, setCountry] = useState(initialDirectory.country);
+  const [status, setStatus] = useState<(typeof statusOptions)[number]>(initialDirectory.status);
+  const [profileFilters, setProfileFilters] = useState<string[]>(initialDirectory.profileFilters);
+  const [sort, setSort] = useState(initialDirectory.sort);
+  const [page, setPage] = useState(initialDirectory.page);
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(
+    [initialDirectory.department, initialDirectory.location, initialDirectory.region, initialDirectory.country, initialDirectory.status].some((value) => value !== "All")
+    || initialDirectory.profileFilters.length > 0,
+  );
   const [directoryPeople, setDirectoryPeople] = useState<Person[]>([]);
   const [pagination, setPagination] = useState({ page: 1, perPage: PER_PAGE, pageCount: 1, totalCount: 0 });
   const [facets, setFacets] = useState<{ departments: Facet[]; locations: Facet[]; regions: Facet[]; countries: Facet[] }>({ departments: [], locations: [], regions: [], countries: [] });
@@ -338,6 +399,32 @@ export function PeopleDashboard({ viewer }: { viewer: { username: string; role: 
       });
     return () => controller.abort();
   }, [directoryRequest]);
+
+  useEffect(() => {
+    const applyDirectoryState = (state: DirectoryState) => {
+      setQuery(state.query);
+      setDepartment(state.department);
+      setLocation(state.location);
+      setRegion(state.region);
+      setCountry(state.country);
+      setStatus(state.status);
+      setProfileFilters(state.profileFilters);
+      setSort(state.sort);
+      setPage(state.page);
+    };
+    const onPopState = () => applyDirectoryState(directoryStateFromParams(new URLSearchParams(window.location.search)));
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    const next = directoryParamsFromState({
+      query, department, location, region, country, status, profileFilters, sort, page,
+    }).toString();
+    const current = window.location.search.replace(/^\?/, "");
+    if (next === current) return;
+    window.history.replaceState(window.history.state, "", next ? `/?${next}` : "/");
+  }, [query, department, location, region, country, status, profileFilters, sort, page]);
 
   const activeFilters = [department, location, region, country, status].filter((value) => value !== "All").length + (profileFilters.length > 0 ? 1 : 0);
   const resetPage = () => setPage(1);
