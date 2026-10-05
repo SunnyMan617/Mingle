@@ -151,13 +151,14 @@ async function readDirectory(): Promise<{ data: CacheFile; source: "slack" | "de
   }
 }
 
-async function readSentStatuses(userIds: string[]) {
+async function readSentStatuses(userIds: string[], markedBy: string) {
   if (userIds.length === 0) return { available: true, rows: new Map<string, string>() };
 
   const admin = createAuthAdminClient();
   const { data, error } = await admin
     .from("sent_users")
     .select("slack_user_id,marked_at")
+    .eq("marked_by", markedBy)
     .in("slack_user_id", userIds);
 
   if (error) {
@@ -319,7 +320,7 @@ export async function GET(request: Request) {
   const page = Math.min(requestedPage, pageCount);
   const start = (page - 1) * perPage;
   const pagePeople = filtered.slice(start, start + perPage);
-  const sentStatuses = await readSentStatuses(pagePeople.map((person) => String(person.id)));
+  const sentStatuses = await readSentStatuses(pagePeople.map((person) => String(person.id)), auth.user.id);
 
   return Response.json({
     people: pagePeople.map((person) => ({

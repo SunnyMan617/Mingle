@@ -29,13 +29,22 @@ export async function signInAction(_: AuthState, formData: FormData): Promise<Au
   }
 
   const supabase = await createAuthClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const unconfirmed = error?.code === "email_not_confirmed" || /email not confirmed/i.test(error?.message || "");
+  if (unconfirmed) {
+    const admin = createAuthAdminClient();
+    const { data: profile } = await admin.from("app_profiles").select("id,status").ilike("email", email).maybeSingle();
+    if (profile?.id) {
+      await admin.auth.admin.updateUserById(profile.id, { email_confirm: true });
+      ({ data, error } = await supabase.auth.signInWithPassword({ email, password }));
+    }
+  }
   if (error || !data.user) {
-    const unconfirmed = error?.code === "email_not_confirmed" || /email not confirmed/i.test(error?.message || "");
-    return { error: unconfirmed ? "Your account was approved, but the email is not confirmed yet. Ask an administrator to approve it again." : "The email/username or password is incorrect." };
+    return { error: "The email/username or password is incorrect." };
   }
 
-  const { data: profile } = await supabase.from("app_profiles").select("status").eq("id", data.user.id).maybeSingle();
+  const admin = createAuthAdminClient();
+  const { data: profile } = await admin.from("app_profiles").select("status").eq("id", data.user.id).maybeSingle();
   if (!profile || profile.status !== "approved") redirect("/auth/pending");
   redirect(safeNextPath(value(formData, "next")));
 }
@@ -57,29 +66,29 @@ export async function signUpAction(_: AuthState, formData: FormData): Promise<Au
   const { data: existing } = await admin.from("app_profiles").select("id").ilike("username", username).maybeSingle();
   if (existing) return { error: "That username is already in use." };
 
-  const supabase = await createAuthClient();
-  const { data: signUpData, error } = await supabase.auth.signUp({
+  const { data: existingEmail } = await admin.from("app_profiles").select("id").ilike("email", email).maybeSingle();
+  if (existingEmail) return { error: "An account already exists for this email." };
+
+  const { data: created, error } = await admin.auth.admin.createUser({
     email,
     password,
-    options: { data: { username } },
+    email_confirm: true,
+    user_metadata: { username },
   });
-  if (error) {
-    const duplicate = /already|registered|exists/i.test(error.message);
-    return { error: duplicate ? "An account already exists for this email." : error.message };
-  }
-  if (!signUpData.user || signUpData.user.identities?.length === 0) {
-    return { error: "An account already exists for this email." };
+  if (error || !created.user) {
+    const duplicate = /already|registered|exists/i.test(error?.message || "");
+    return { error: duplicate ? "An account already exists for this email." : error?.message || "Unable to create the access request." };
   }
 
   const { error: profileError } = await admin.from("app_profiles").insert({
-    id: signUpData.user.id,
+    id: created.user.id,
     email,
     username,
     role: "user",
     status: "pending",
   });
   if (profileError) {
-    await admin.auth.admin.deleteUser(signUpData.user.id);
+    await admin.auth.admin.deleteUser(created.user.id);
     return { error: /username/i.test(profileError.message) ? "That username is already in use." : "Unable to create the access request. Please try again." };
   }
   redirect("/auth/pending?created=1");

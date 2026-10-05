@@ -27,11 +27,11 @@ export async function PATCH(request: Request, context: RouteContext<"/api/sent-u
   const admin = createAuthAdminClient();
   if (body.sent) {
     const markedAt = new Date().toISOString();
-    const { error } = await admin.from("sent_users").insert({
+    const { error } = await admin.from("sent_users").upsert({
       slack_user_id: id,
       marked_by: auth.user.id,
       marked_at: markedAt,
-    });
+    }, { onConflict: "slack_user_id,marked_by" });
 
     if (error && error.code !== "23505") {
       console.error("Unable to mark Slack user as sent", { code: error.code });
@@ -43,7 +43,7 @@ export async function PATCH(request: Request, context: RouteContext<"/api/sent-u
     return Response.json({ sent: true, sentAt: error?.code === "23505" ? null : markedAt }, { headers: { "Cache-Control": "no-store" } });
   }
 
-  const { error } = await admin.from("sent_users").delete().eq("slack_user_id", id);
+  const { error } = await admin.from("sent_users").delete().eq("slack_user_id", id).eq("marked_by", auth.user.id);
   if (error) {
     console.error("Unable to unmark Slack user as sent", { code: error.code });
     return Response.json(
