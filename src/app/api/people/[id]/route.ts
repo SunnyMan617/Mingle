@@ -28,12 +28,14 @@ async function readSession(): Promise<SlackSession> {
   }
 }
 
-async function slackRequest(session: SlackSession, endpoint: string, fields: Record<string, string> = {}) {
+async function slackRequest(session: SlackSession, endpoint: string, fields: Record<string, string> = {}, query: Record<string, string> = {}) {
   const body = new FormData();
   body.append("token", session.token);
   for (const [key, value] of Object.entries(fields)) body.append(key, value);
+  const search = new URLSearchParams(query).toString();
+  const url = `${session.origin}/api/${endpoint}${search ? `?${search}` : ""}`;
 
-  const response = await fetch(`${session.origin}/api/${endpoint}`, {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       accept: "application/json, text/plain, */*",
@@ -69,16 +71,15 @@ export async function GET(_request: Request, context: RouteContext<"/api/people/
   try {
     const session = await readSession();
     const [profileResponse, sectionsResponse, extrasResponse, schema] = await Promise.all([
-      slackRequest(session, "users.profile.get", { user: id }),
+      slackRequest(session, "users.profile.get", { user: id, include_labels: "true" }),
       slackRequest(session, "users.profile.getSections", {
         user: id,
         _x_reason: "profiles",
         _x_mode: "online",
         _x_sonic: "true",
         _x_app_name: "client",
-        _x_gantry: "true",
-      }),
-      slackRequest(session, "users.profile.getExtras", { user: id, keys: "im_mpim_ids", _x_reason: "useProfileExtras", _x_mode: "online", _x_sonic: "true", _x_app_name: "client" }),
+      }, { _x_gantry: "true" }).catch(() => ({})),
+      slackRequest(session, "users.profile.getExtras", { user: id, keys: "im_mpim_ids", _x_reason: "useProfileExtras", _x_mode: "online", _x_sonic: "true", _x_app_name: "client" }).catch(() => ({})),
       profileSchema(session),
     ]);
 

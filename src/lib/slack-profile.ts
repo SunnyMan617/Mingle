@@ -77,16 +77,27 @@ function isHidden(value: Record<string, unknown>) {
 }
 
 function sectionElements(section: Record<string, unknown>) {
-  const candidates = [section.profileElements, section.profile_elements, section.elements, section.fields, section.items];
+  const candidates = [
+    section.profileElements, section.profile_elements, section.profileFields, section.profile_fields,
+    section.elements, section.fields, section.items, section.contents, section.rows, section.children, section.modules,
+  ];
   for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate.filter(isRecord);
+    const parsed = parseMaybeJson(candidate);
+    if (Array.isArray(parsed)) return parsed.filter(isRecord);
   }
   return [];
 }
 
 function looksLikeSection(value: unknown): value is Record<string, unknown> {
   if (!isRecord(value)) return false;
-  return sectionElements(value).length > 0 || Boolean(textOf(value.label) || value.type || value.section_type);
+  return sectionElements(value).length > 0 || Boolean(
+    textOf(value.label)
+    || value.type
+    || value.section_type
+    || value.sectionType
+    || value.section_id
+    || value.sectionId,
+  );
 }
 
 function collectFromPaths(root: Record<string, unknown>): unknown[] {
@@ -102,6 +113,7 @@ function collectFromPaths(root: Record<string, unknown>): unknown[] {
   const rootProfile = isRecord(root.profile) ? root.profile : {};
 
   return [
+    result,
     root.sections,
     root.profile_sections,
     root.profileSections,
@@ -110,6 +122,7 @@ function collectFromPaths(root: Record<string, unknown>): unknown[] {
     resultRecord.sections,
     resultRecord.profile_sections,
     resultRecord.profileSections,
+    resultRecord.profile_fields,
     user.profileSections,
     userProfile.profileSections,
     userProfile.sections,
@@ -147,21 +160,21 @@ export function extractProfileSections(payload: unknown): Record<string, unknown
 
 function detailFromElement(element: Record<string, unknown>, sectionLabel: string, sectionOrder: number, index: number): ProfileDetail | null {
   if (isHidden(element)) return null;
-  const nested = [element.field, element.profileField, element.profile_field, element.item].find(isRecord) || {};
-  const rawValue = element.value ?? element.text ?? nested.value ?? nested.text ?? element.alt ?? nested.alt;
-  const alt = element.alt ?? nested.alt ?? element.displayValue ?? nested.displayValue;
+  const nested = [element.field, element.profileField, element.profile_field, element.item, element.element].find(isRecord) || {};
+  const rawValue = element.value ?? element.text ?? element.displayValue ?? nested.value ?? nested.text ?? nested.displayValue ?? element.alt ?? nested.alt;
+  const alt = element.alt ?? nested.alt ?? element.displayValue ?? nested.displayValue ?? element.display_value ?? nested.display_value;
   const normalized = fieldValue(typeof rawValue === "string" ? rawValue : textOf(rawValue), typeof alt === "string" ? alt : textOf(alt));
-  const displayValue = normalized.displayValue || textOf(element.text) || textOf(nested.text);
+  const displayValue = normalized.displayValue || textOf(element.displayValue) || textOf(element.display_value) || textOf(element.text) || textOf(nested.text);
   if (!displayValue) return null;
 
-  const label = textOf(element.label) || textOf(nested.label) || textOf(element.field_name) || textOf(nested.field_name) || "Profile detail";
-  const id = cleanText(element.id ?? nested.id ?? element.field_id ?? nested.field_id ?? `${sectionLabel}:${label}:${index}`);
+  const label = textOf(element.label) || textOf(nested.label) || textOf(element.field_name) || textOf(nested.field_name) || textOf(element.fieldName) || "Profile detail";
+  const id = cleanText(element.id ?? nested.id ?? element.field_id ?? nested.field_id ?? element.fieldId ?? nested.fieldId ?? `${sectionLabel}:${label}:${index}`);
   const url = normalized.url || urlOf(element) || urlOf(nested) || urlOf(rawValue);
 
   return {
     id: id || `${sectionLabel}:${index}`,
     label,
-    type: cleanText(element.type ?? nested.type ?? element.field_type ?? "text") || "text",
+    type: cleanText(element.type ?? nested.type ?? element.field_type ?? element.elementType ?? "text") || "text",
     section: sectionLabel,
     sectionOrder,
     order: Number(element.ordering ?? element.order ?? nested.ordering ?? index),
@@ -171,27 +184,58 @@ function detailFromElement(element: Record<string, unknown>, sectionLabel: strin
   };
 }
 
+function detailsFromLooseFields(payload: unknown): { details: ProfileDetail[]; sections: ProfileSectionSummary[] } {
+  const details: ProfileDetail[] = [];
+  const seen = new Set<string>();
+
+  const visit = (value: unknown, depth = 0) => {
+    if (depth > 8 || value == null) return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => visit(item, depth + 1));
+      return;
+    }
+    if (!isRecord(value)) return;
+    const parsed = detailFromElement(value, textOf(value.section) || "Additional information", Number(value.sectionOrder || 99), details.length);
+    if (parsed) {
+      const key = `${parsed.id}:${parsed.label}:${parsed.displayValue}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        details.push(parsed);
+      }
+    }
+    Object.values(value).forEach((child) => visit(child, depth + 1));
+  };
+
+  visit(parseMaybeJson(payload));
+  return {
+    details,
+    sections: details.length ? [{ label: "Additional information", count: details.length }] : [],
+  };
+}
+
 export function detailsFromSections(payload: unknown): { details: ProfileDetail[]; sections: ProfileSectionSummary[] } {
   const sections = extractProfileSections(payload);
   const details: ProfileDetail[] = [];
   const summaries: ProfileSectionSummary[] = [];
 
   sections.forEach((section, sectionIndex) => {
-    const label = textOf(section.label) || textOf(section.type) || textOf(section.section_type) || "Additional information";
+    const label = textOf(section.label) || textOf(section.type) || textOf(section.section_type) || textOf(section.sectionType) || "Additional information";
     const sectionOrder = Number(section.order ?? section.ordering ?? sectionIndex);
     const elements = sectionElements(section);
-    const parsed = elements
+    const source = elements.length > 0 ? elements : looksLikeSection(section) && (textOf(section.value) || textOf(section.displayValue)) ? [section] : [];
+    const parsed = source
       .map((element, index) => detailFromElement(element, label, sectionOrder, index))
       .filter((detail): detail is ProfileDetail => Boolean(detail));
     summaries.push({ label, count: parsed.length });
     details.push(...parsed);
   });
 
-  return { details, sections: summaries };
+  if (details.length > 0) return { details, sections: summaries };
+  return detailsFromLooseFields(payload);
 }
 
 export function detailsFromProfileFields(
-  fields: Record<string, { value?: unknown; alt?: unknown }> | undefined,
+  fields: Record<string, { value?: unknown; alt?: unknown; label?: unknown }> | undefined,
   schema: { fields: SlackFieldDefinition[]; sections: SlackSectionDefinition[] },
 ): ProfileDetail[] {
   const definitions = new Map(schema.fields.map((field) => [field.id, field]));
@@ -204,7 +248,7 @@ export function detailsFromProfileFields(
     const section = definition?.section_id ? sections.get(definition.section_id) : undefined;
     return [{
       id: fieldId,
-      label: definition?.label || definition?.field_name || "Profile detail",
+      label: cleanText(rawField?.label) || definition?.label || definition?.field_name || "Profile detail",
       type: definition?.type || "text",
       section: section?.label || "Additional information",
       sectionOrder: Number(section?.order || 99),
