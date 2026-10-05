@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { gunzip } from "node:zlib";
+import { promisify } from "node:util";
 import { getApprovedAuthContext } from "@/lib/auth";
+import { createAuthAdminClient } from "@/lib/supabase/admin";
 import { cleanText, detailsFromProfileFields, detailsFromSections, mergeProfileDetails } from "@/lib/slack-profile";
 
 type SlackSession = { origin: string; token: string; cookie: string };
@@ -13,8 +16,23 @@ type SlackField = {
   section_id?: string;
 };
 type SlackSection = { id: string; label?: string; order?: number };
+type ProfileDetailField = {
+  id: string; label: string; type: string; section: string; value: string; displayValue: string; url: string;
+};
+type DetailedProfile = {
+  title?: string; phone?: string; skype?: string; realName?: string; displayName?: string;
+  firstName?: string; lastName?: string; email?: string; statusText?: string; statusEmoji?: string;
+  details?: ProfileDetailField[];
+};
+type ProfileDetailsSnapshot = { profiles: Record<string, DetailedProfile> };
+
+const DIRECTORY_BUCKET = process.env.SUPABASE_DIRECTORY_BUCKET || "mingle-directory-data";
+const REMOTE_CACHE_TTL = 5 * 60 * 1000;
+const gunzipAsync = promisify(gunzip);
 
 let schemaPromise: Promise<{ fields: SlackField[]; sections: SlackSection[] }> | null = null;
+let remoteProfileDetailsCache: ProfileDetailsSnapshot | null = null;
+let remoteProfileDetailsCachedAt = 0;
 
 async function readSession(): Promise<SlackSession> {
   try {
@@ -62,6 +80,50 @@ async function profileSchema(session: SlackSession) {
   return schemaPromise;
 }
 
+async function readProfileDetailsSnapshot(): Promise<ProfileDetailsSnapshot | null> {
+  if (process.env.DIRECTORY_DATA_SOURCE !== "remote") {
+    try {
+      return JSON.parse(await readFile(join(process.cwd(), ".data", "slack-profile-details.json"), "utf8")) as ProfileDetailsSnapshot;
+    } catch {
+      // Deployed functions do not contain the git-ignored local snapshot.
+    }
+  }
+
+  try {
+    if (remoteProfileDetailsCache && Date.now() - remoteProfileDetailsCachedAt < REMOTE_CACHE_TTL) {
+      return remoteProfileDetailsCache;
+    }
+    const supabase = createAuthAdminClient();
+    const { data, error } = await supabase.storage.from(DIRECTORY_BUCKET).download("snapshots/slack-profile-details.json.gz");
+    if (error) throw error;
+    remoteProfileDetailsCache = JSON.parse((await gunzipAsync(Buffer.from(await data.arrayBuffer()))).toString("utf8")) as ProfileDetailsSnapshot;
+    remoteProfileDetailsCachedAt = Date.now();
+    return remoteProfileDetailsCache;
+  } catch {
+    return null;
+  }
+}
+
+function snapshotResponse(profile: DetailedProfile) {
+  const details = profile.details || [];
+  const sectionCounts = new Map<string, number>();
+  for (const field of details) {
+    sectionCounts.set(field.section || "Additional information", (sectionCounts.get(field.section || "Additional information") || 0) + 1);
+  }
+  return {
+    profile: {
+      title: cleanText(profile.title), phone: cleanText(profile.phone), skype: cleanText(profile.skype),
+      realName: cleanText(profile.realName), displayName: cleanText(profile.displayName),
+      firstName: cleanText(profile.firstName), lastName: cleanText(profile.lastName), email: cleanText(profile.email),
+      statusText: cleanText(profile.statusText), statusEmoji: cleanText(profile.statusEmoji),
+      statusExpiration: 0, imageOriginal: "",
+    },
+    details,
+    sections: [...sectionCounts.entries()].map(([label, count]) => ({ label, count })),
+    extras: { onboardingComplete: false, channelCount: 0, sharedChannelCount: 0 },
+  };
+}
+
 export async function GET(_request: Request, context: RouteContext<"/api/people/[id]">) {
   const auth = await getApprovedAuthContext();
   if (!auth) return Response.json({ error: "Approved account required." }, { status: 401 });
@@ -105,8 +167,19 @@ export async function GET(_request: Request, context: RouteContext<"/api/people/
       },
     });
   } catch (error) {
+    const snapshot = await readProfileDetailsSnapshot();
+    const cached = snapshot?.profiles?.[id];
+    if (cached) return Response.json(snapshotResponse(cached));
+
     const message = error instanceof Error ? error.message : "Could not load Slack profile";
     const missingSession = /session\.json|ENOENT|session is not configured/i.test(message);
-    return Response.json({ error: missingSession ? "Slack profile session is not configured" : message }, { status: missingSession ? 503 : 502 });
+    const expiredSession = /invalid_auth|token_revoked|not_authed/i.test(message);
+    return Response.json({
+      error: missingSession
+        ? "Slack profile session is not configured"
+        : expiredSession
+          ? "Slack session expired"
+          : message,
+    }, { status: missingSession || expiredSession ? 503 : 502 });
   }
 }
