@@ -8,6 +8,20 @@ create table if not exists public.sent_users (
 );
 
 alter table public.sent_users drop constraint if exists sent_users_pkey;
+
+update public.sent_users
+set marked_by = (
+  select id from public.app_profiles
+  where role = 'admin' and status = 'approved'
+  order by created_at asc
+  limit 1
+)
+where marked_by is null
+   or marked_by not in (
+     select id from public.app_profiles
+     where role = 'admin' and status = 'approved'
+   );
+
 delete from public.sent_users where marked_by is null;
 alter table public.sent_users
   alter column marked_by set not null;
