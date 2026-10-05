@@ -190,45 +190,55 @@ function csvCell(value: string | number | boolean | undefined) {
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
-function peopleCsv(people: Person[], profileFlags: (person: Person) => ProfileFlags, detailsSnapshot: ProfileDetailsSnapshot | null) {
-  const detailProfiles = detailsSnapshot?.profiles || {};
-  const customFields = new Map<string, { header: string; sectionOrder: number; order: number }>();
+function fieldLabelMatches(label: string, patterns: readonly string[]) {
+  const normalized = label.trim().toLowerCase();
+  return patterns.some((pattern) => normalized === pattern || normalized.includes(pattern));
+}
 
-  for (const person of people) {
-    for (const field of detailProfiles[String(person.id)]?.details || []) {
-      if (!customFields.has(field.id)) {
-        customFields.set(field.id, {
-          header: `${field.section || "Additional information"} · ${field.label || "Profile detail"}`,
-          sectionOrder: Number(field.sectionOrder || 99),
-          order: Number(field.order || 99),
-        });
-      }
-    }
+function customFieldValue(
+  person: Person,
+  details: DetailedProfile | undefined,
+  patterns: readonly string[],
+  preferUrl = false,
+) {
+  for (const field of details?.details || []) {
+    if (!fieldLabelMatches(field.label, patterns)) continue;
+    const value = preferUrl ? field.url || field.displayValue || field.value : field.displayValue || field.value;
+    if (value) return value;
   }
 
-  const orderedCustomFields = [...customFields.entries()].sort(([, a], [, b]) =>
-    a.sectionOrder - b.sectionOrder || a.order - b.order || a.header.localeCompare(b.header));
+  for (const field of person.customFields || []) {
+    if (!fieldLabelMatches(field.label, patterns)) continue;
+    const slackLink = field.value.match(/^<([^|>]+)(?:\|([^>]+))?>$/);
+    const url = slackLink?.[1]?.startsWith("http") ? slackLink[1] : /^https?:\/\//i.test(field.value) ? field.value : "";
+    const value = preferUrl ? url || field.alt || field.value : field.alt || slackLink?.[2] || field.value;
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function peopleCsv(people: Person[], detailsSnapshot: ProfileDetailsSnapshot | null) {
+  const detailProfiles = detailsSnapshot?.profiles || {};
   const columns = [
-    "Slack ID", "Name", "Real name", "Display name", "First name", "Last name",
-    "Job title", "Professional group", "Slack username", "Region", "Country", "Time zone",
-    "Slack status", "Status message", "Status emoji", "Email", "Phone", "Skype", "Locale", "Has photo",
-    ...orderedCustomFields.map(([, field]) => field.header),
+    "Name", "Email", "Phone", "Job title", "Company", "Professional group",
+    "Slack username", "LinkedIn", "Country", "Region", "Time zone",
   ];
   const rows = people.map((person) => {
-    const flags = profileFlags(person);
     const details = detailProfiles[String(person.id)];
-    const customValues = new Map((details?.details || []).map((field) => [field.id, field.displayValue || field.value]));
     const namedCustomValues = new Map((details?.details || []).map((field) => [field.label.trim().toLowerCase(), field.displayValue || field.value]));
     return [
-      person.id, person.name, details?.realName || person.realName, details?.displayName || person.displayName,
-      details?.firstName || person.firstName, details?.lastName || person.lastName,
-      details?.title || namedCustomValues.get("title") || person.title, person.department, person.username,
-      person.region, person.country, person.location, person.status,
-      details?.statusText || person.statusText, details?.statusEmoji || person.statusEmoji,
+      person.name,
       details?.email || namedCustomValues.get("email") || person.email,
-      details?.phone || namedCustomValues.get("phone") || person.phone, details?.skype || person.skype,
-      details?.locale || person.locale, flags.hasPhoto ? "Yes" : "No",
-      ...orderedCustomFields.map(([fieldId]) => customValues.get(fieldId) || ""),
+      details?.phone || namedCustomValues.get("phone") || person.phone,
+      details?.title || namedCustomValues.get("title") || person.title,
+      customFieldValue(person, details, ["company", "organization", "employer", "workplace"]),
+      person.department,
+      person.username,
+      customFieldValue(person, details, ["linkedin"], true),
+      person.country,
+      person.region,
+      person.location,
     ].map(csvCell).join(",");
   });
 
@@ -294,10 +304,10 @@ export async function GET(request: Request) {
 
   if (searchParams.get("format") === "csv") {
     const profileDetails = await readProfileDetails();
-    return new Response(peopleCsv(filtered, profileFlags, profileDetails), {
+    return new Response(peopleCsv(filtered, profileDetails), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="techqueria-people-detailed.csv"',
+        "Content-Disposition": 'attachment; filename="techqueria-people.csv"',
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         "X-Mingle-Profile-Details": profileDetails?.complete ? "complete" : profileDetails ? "partial" : "unavailable",
